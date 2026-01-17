@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Check, Star } from 'lucide-react';
+import { Check, Star, Eye } from 'lucide-react';
 import { Plan, PLANS } from '@/types/resume';
 import { useResumeStore } from '@/store/resumeStore';
+import { useTemplateStore } from '@/store/templateStore';
 import { cn } from '@/lib/utils';
 
 const planOrder: Plan[] = ['basic', 'intermediate', 'professional'];
@@ -15,10 +16,25 @@ const planStyles: Record<Plan, { badge?: string; accent: string; bg: string }> =
 export function PricingSection() {
   const navigate = useNavigate();
   const createResume = useResumeStore((state) => state.createResume);
+  const templates = useTemplateStore((state) => state.templates);
 
   const handleSelectPlan = (plan: Plan) => {
     const resume = createResume(plan);
     navigate(`/editor/${resume.id}`);
+  };
+
+  // Get active templates for each plan
+  const getTemplatesForPlan = (plan: Plan) => {
+    if (plan === 'professional') {
+      // Professional gets all active templates
+      return templates.filter((t) => t.isActive);
+    } else if (plan === 'intermediate') {
+      // Intermediate gets basic + intermediate templates
+      return templates.filter((t) => t.isActive && (t.category === 'basic' || t.category === 'intermediate'));
+    } else {
+      // Basic gets only basic templates
+      return templates.filter((t) => t.isActive && t.category === 'basic');
+    }
   };
 
   return (
@@ -36,6 +52,7 @@ export function PricingSection() {
             const plan = PLANS[planKey];
             const style = planStyles[planKey];
             const isFeatured = planKey === 'professional';
+            const planTemplates = getTemplatesForPlan(planKey);
 
             return (
               <div
@@ -76,7 +93,7 @@ export function PricingSection() {
                   </div>
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-6">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-3">
                       <div className={cn(
@@ -97,6 +114,44 @@ export function PricingSection() {
                     </li>
                   ))}
                 </ul>
+
+                {/* Templates Preview */}
+                {planTemplates.length > 0 && (
+                  <div className="mb-6">
+                    <p className={cn(
+                      'text-xs font-medium mb-2',
+                      isFeatured ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                    )}>
+                      Modelos disponíveis:
+                    </p>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {planTemplates.slice(0, 3).map((template) => (
+                        <div
+                          key={template.id}
+                          className="relative w-12 h-16 rounded-md overflow-hidden border-2 border-white/20 shrink-0 group cursor-pointer"
+                          title={template.name}
+                        >
+                          <img
+                            src={template.previewUrl || '/placeholder.svg'}
+                            alt={template.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Eye className="w-3 h-3 text-white" />
+                          </div>
+                        </div>
+                      ))}
+                      {planTemplates.length > 3 && (
+                        <div className={cn(
+                          'w-12 h-16 rounded-md flex items-center justify-center text-xs font-medium shrink-0',
+                          isFeatured ? 'bg-white/10 text-white' : 'bg-secondary text-muted-foreground'
+                        )}>
+                          +{planTemplates.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => handleSelectPlan(planKey)}

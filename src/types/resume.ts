@@ -55,6 +55,17 @@ export interface Resume {
   updatedAt: Date;
 }
 
+// Template Model for admin management
+export interface TemplateModel {
+  id: string;
+  name: string;
+  category: Plan;
+  previewUrl: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export const PLANS = {
   basic: { name: 'Básico', price: 2.0, features: ['1 modelo de currículo', 'Download em PDF'] },
   intermediate: { name: 'Intermediário', price: 3.0, features: ['3 modelos de currículo', 'Download em PDF', 'Cores personalizadas'] },
