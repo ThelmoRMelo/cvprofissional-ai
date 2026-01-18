@@ -149,9 +149,12 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
             {/* Preview */}
             <div className="aspect-[3/4] bg-secondary relative overflow-hidden">
               <img
-                src={template.previewUrl || '/placeholder.svg'}
+                src={template.previewUrl && template.previewUrl.trim() !== '' ? template.previewUrl : '/placeholder.svg'}
                 alt={template.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/placeholder.svg';
+                }}
               />
               <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,8 @@ serve(async (req) => {
   try {
     const { prompt, category, imageBase64, imageMimeType } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -86,7 +89,7 @@ Exemplo de estrutura esperada:
       });
     }
 
-    console.log("Calling AI gateway...");
+    console.log("Calling AI gateway for HTML generation...");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -121,7 +124,7 @@ Exemplo de estrutura esperada:
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log("AI response received for HTML");
 
     const generatedHtml = data.choices?.[0]?.message?.content;
 
@@ -135,10 +138,97 @@ Exemplo de estrutura esperada:
       .replace(/```\n?/gi, '')
       .trim();
 
-    console.log("Template generated successfully, length:", cleanHtml.length);
+    console.log("Template HTML generated successfully, length:", cleanHtml.length);
+
+    // Now generate preview image using AI image generation
+    let previewUrl = '/placeholder.svg';
+    
+    try {
+      console.log("Generating preview image...");
+      
+      const previewPrompt = `Create a professional resume/CV preview thumbnail image. 
+The design should be: ${category === 'basic' ? 'minimalist with grayscale colors' : category === 'intermediate' ? 'modern with dark blue and gray tones' : 'elegant with sophisticated gradients in dark blue/green tones'}.
+Show a clean A4 resume layout with:
+- Header section with name placeholder
+- Contact information area
+- Professional sections for experience, education, skills
+- Clean typography and professional spacing
+Style: Professional document preview, high resolution, suitable as a template thumbnail.
+Ultra high resolution preview image.`;
+
+      const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: previewPrompt
+            }
+          ],
+          modalities: ["image", "text"]
+        }),
+      });
+
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        const generatedImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (generatedImage && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+          console.log("Preview image generated, uploading to storage...");
+          
+          // Extract base64 data from the data URL
+          const base64Match = generatedImage.match(/^data:([^;]+);base64,(.+)$/);
+          
+          if (base64Match) {
+            const mimeType = base64Match[1];
+            const base64Data = base64Match[2];
+            
+            // Convert base64 to Uint8Array
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            // Upload to Supabase storage
+            const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+            const fileName = `preview-${Date.now()}.png`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('template-references')
+              .upload(fileName, bytes, {
+                contentType: mimeType,
+                upsert: true
+              });
+            
+            if (!uploadError && uploadData) {
+              const { data: urlData } = supabase.storage
+                .from('template-references')
+                .getPublicUrl(fileName);
+              
+              previewUrl = urlData.publicUrl;
+              console.log("Preview image uploaded successfully:", previewUrl);
+            } else {
+              console.warn("Failed to upload preview image:", uploadError);
+            }
+          }
+        }
+      } else {
+        console.warn("Failed to generate preview image, using placeholder");
+      }
+    } catch (imageError) {
+      console.warn("Error generating preview image:", imageError);
+      // Continue with placeholder
+    }
 
     return new Response(JSON.stringify({ 
       html: cleanHtml,
+      previewUrl,
       success: true 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

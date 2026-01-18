@@ -116,25 +116,30 @@ export function PricingSection() {
                 </ul>
 
                 {/* Templates Preview */}
-                {planTemplates.length > 0 && (
-                  <div className="mb-6">
-                    <p className={cn(
-                      'text-xs font-medium mb-2',
-                      isFeatured ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                    )}>
-                      Modelos disponíveis:
-                    </p>
+                <div className="mb-6">
+                  <p className={cn(
+                    'text-xs font-medium mb-2',
+                    isFeatured ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                  )}>
+                    {planTemplates.length > 0 
+                      ? `${planTemplates.length} modelo${planTemplates.length > 1 ? 's' : ''} disponíve${planTemplates.length > 1 ? 'is' : 'l'}:`
+                      : 'Modelos em breve'}
+                  </p>
+                  {planTemplates.length > 0 && (
                     <div className="flex gap-2 overflow-x-auto pb-2">
                       {planTemplates.slice(0, 3).map((template) => (
                         <div
                           key={template.id}
-                          className="relative w-12 h-16 rounded-md overflow-hidden border-2 border-white/20 shrink-0 group cursor-pointer"
+                          className="relative w-12 h-16 rounded-md overflow-hidden border-2 border-white/20 shrink-0 group cursor-pointer bg-secondary"
                           title={template.name}
                         >
                           <img
-                            src={template.previewUrl || '/placeholder.svg'}
+                            src={template.previewUrl && template.previewUrl.trim() !== '' ? template.previewUrl : '/placeholder.svg'}
                             alt={template.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = '/placeholder.svg';
+                            }}
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Eye className="w-3 h-3 text-white" />
@@ -150,8 +155,8 @@ export function PricingSection() {
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <button
                   onClick={() => handleSelectPlan(planKey)}

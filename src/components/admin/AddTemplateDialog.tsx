@@ -152,11 +152,16 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
         throw new Error(data?.error || 'Erro ao gerar template');
       }
 
+      // Use the generated preview URL from AI, or fallback to user-provided URL, or placeholder
+      const finalPreviewUrl = data.previewUrl && data.previewUrl !== '/placeholder.svg' 
+        ? data.previewUrl 
+        : (formData.previewUrl || '/placeholder.svg');
+
       // Create the template
       onTemplateCreated({
         name: formData.name,
         category: formData.category,
-        previewUrl: formData.previewUrl || '/placeholder.svg',
+        previewUrl: finalPreviewUrl,
         referenceFileUrl,
         prompt: formData.prompt,
         generatedHtml: data.html,
