@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Edit, Trash2, Eye, LayoutGrid, ArrowLeft } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, LayoutGrid, ArrowLeft, Code } from 'lucide-react';
 import { useTemplateStore } from '@/store/templateStore';
 import { Plan, PLANS, TemplateModel } from '@/types/resume';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { AddTemplateDialog } from './AddTemplateDialog';
 
 interface TemplateManagementProps {
   onBack: () => void;
@@ -29,12 +31,14 @@ interface TemplateManagementProps {
 
 export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateManagementProps) {
   const { templates, addTemplate, updateTemplate, deleteTemplate, toggleTemplateActive } = useTemplateStore();
-  const [isDialogOpen, setIsDialogOpen] = useState(initialShowAdd);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(initialShowAdd);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateModel | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     category: 'basic' as Plan,
     previewUrl: '',
+    prompt: '',
   });
   const [filterCategory, setFilterCategory] = useState<Plan | 'all'>('all');
 
@@ -42,34 +46,30 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
     filterCategory === 'all' ? true : t.category === filterCategory
   );
 
-  const handleOpenDialog = (template?: TemplateModel) => {
-    if (template) {
-      setEditingTemplate(template);
-      setFormData({
-        name: template.name,
-        category: template.category,
-        previewUrl: template.previewUrl,
-      });
-    } else {
-      setEditingTemplate(null);
-      setFormData({ name: '', category: 'basic', previewUrl: '' });
-    }
-    setIsDialogOpen(true);
+  const handleOpenAddDialog = () => {
+    setIsAddDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.name) return;
+  const handleOpenEditDialog = (template: TemplateModel) => {
+    setEditingTemplate(template);
+    setFormData({
+      name: template.name,
+      category: template.category,
+      previewUrl: template.previewUrl,
+      prompt: template.prompt || '',
+    });
+    setIsEditDialogOpen(true);
+  };
 
-    if (editingTemplate) {
-      updateTemplate(editingTemplate.id, formData);
-    } else {
-      addTemplate({
-        ...formData,
-        isActive: true,
-      });
-    }
-    setIsDialogOpen(false);
-    setFormData({ name: '', category: 'basic', previewUrl: '' });
+  const handleTemplateCreated = (templateData: Omit<TemplateModel, 'id' | 'createdAt' | 'updatedAt'>) => {
+    addTemplate(templateData);
+  };
+
+  const handleSaveEdit = () => {
+    if (!formData.name || !editingTemplate) return;
+    updateTemplate(editingTemplate.id, formData);
+    setIsEditDialogOpen(false);
+    setFormData({ name: '', category: 'basic', previewUrl: '', prompt: '' });
   };
 
   const handleDelete = (id: string) => {
@@ -112,7 +112,7 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
             </p>
           </div>
         </div>
-        <Button onClick={() => handleOpenDialog()} className="gap-2">
+        <Button onClick={handleOpenAddDialog} className="gap-2">
           <Plus className="w-4 h-4" />
           Adicionar modelo
         </Button>
@@ -155,7 +155,7 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
               />
               <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
-                  onClick={() => handleOpenDialog(template)}
+                  onClick={() => handleOpenEditDialog(template)}
                   className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <Edit className="w-4 h-4 text-primary" />
@@ -201,7 +201,7 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
 
         {/* Add New Card */}
         <button
-          onClick={() => handleOpenDialog()}
+          onClick={handleOpenAddDialog}
           className="aspect-[3/4] bg-secondary/50 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-accent hover:bg-secondary transition-all group"
         >
           <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
@@ -213,26 +213,31 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
         </button>
       </div>
 
-      {/* Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Add Template Dialog with AI */}
+      <AddTemplateDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onTemplateCreated={handleTemplateCreated}
+      />
+
+      {/* Edit Template Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? 'Editar modelo' : 'Adicionar modelo'}
-            </DialogTitle>
+            <DialogTitle>Editar modelo</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nome do modelo</Label>
+              <Label htmlFor="edit-name">Nome do modelo</Label>
               <Input
-                id="name"
+                id="edit-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ex: Moderno Executivo"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Categoria / Plano</Label>
+              <Label htmlFor="edit-category">Categoria / Plano</Label>
               <Select
                 value={formData.category}
                 onValueChange={(value: Plan) => setFormData({ ...formData, category: value })}
@@ -248,16 +253,13 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="preview">URL da imagem de preview</Label>
+              <Label htmlFor="edit-preview">URL da imagem de preview</Label>
               <Input
-                id="preview"
+                id="edit-preview"
                 value={formData.previewUrl}
                 onChange={(e) => setFormData({ ...formData, previewUrl: e.target.value })}
                 placeholder="https://... ou /placeholder.svg"
               />
-              <p className="text-xs text-muted-foreground">
-                Aceita URL de imagem ou caminho local do projeto
-              </p>
             </div>
             {formData.previewUrl && (
               <div className="border rounded-lg overflow-hidden">
@@ -269,13 +271,26 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
                 />
               </div>
             )}
+            {editingTemplate?.generatedHtml && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Code className="w-4 h-4" />
+                  Template HTML gerado
+                </Label>
+                <div className="bg-secondary/50 rounded-lg p-3 text-xs text-muted-foreground max-h-32 overflow-y-auto">
+                  <code className="whitespace-pre-wrap break-all">
+                    {editingTemplate.generatedHtml.substring(0, 500)}...
+                  </code>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={!formData.name}>
-              {editingTemplate ? 'Salvar alterações' : 'Adicionar'}
+            <Button onClick={handleSaveEdit} disabled={!formData.name}>
+              Salvar alterações
             </Button>
           </DialogFooter>
         </DialogContent>

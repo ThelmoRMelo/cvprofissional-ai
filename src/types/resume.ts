@@ -61,6 +61,9 @@ export interface TemplateModel {
   name: string;
   category: Plan;
   previewUrl: string;
+  referenceFileUrl?: string;
+  prompt?: string;
+  generatedHtml?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
