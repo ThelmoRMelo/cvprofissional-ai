@@ -12,6 +12,7 @@ interface TemplateState {
   toggleTemplateActive: (id: string) => void;
   getActiveTemplates: () => TemplateModel[];
   getTemplatesByCategory: (category: Plan) => TemplateModel[];
+  getTemplateById: (id: string) => TemplateModel | undefined;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -93,6 +94,10 @@ export const useTemplateStore = create<TemplateState>()(
 
       getTemplatesByCategory: (category: Plan) => {
         return get().templates.filter((t) => t.category === category && t.isActive);
+      },
+
+      getTemplateById: (id: string) => {
+        return get().templates.find((t) => t.id === id);
       },
     }),
     {
