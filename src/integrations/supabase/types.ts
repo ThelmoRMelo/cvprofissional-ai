@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      resumes: {
+        Row: {
+          access_token: string
+          admin_notes: string | null
+          client_email: string
+          client_name: string
+          client_phone: string
+          created_at: string
+          data: Json
+          download_released: boolean
+          id: string
+          payment_proof_path: string | null
+          payment_status: string
+          plan: string
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string
+          admin_notes?: string | null
+          client_email?: string
+          client_name?: string
+          client_phone?: string
+          created_at?: string
+          data?: Json
+          download_released?: boolean
+          id?: string
+          payment_proof_path?: string | null
+          payment_status?: string
+          plan?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          admin_notes?: string | null
+          client_email?: string
+          client_name?: string
+          client_phone?: string
+          created_at?: string
+          data?: Json
+          download_released?: boolean
+          id?: string
+          payment_proof_path?: string | null
+          payment_status?: string
+          plan?: string
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       site_settings: {
         Row: {
           data: Json
@@ -95,12 +146,38 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      get_resume_status: {
+        Args: { _token: string }
+        Returns: {
+          data: Json
+          download_released: boolean
+          payment_status: string
+          plan: string
+          template_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      save_resume: {
+        Args: {
+          _client_email: string
+          _client_name: string
+          _client_phone: string
+          _data: Json
+          _plan: string
+          _template_id: string
+          _token: string
+        }
+        Returns: string
+      }
+      set_payment_proof: {
+        Args: { _path: string; _token: string }
+        Returns: undefined
       }
     }
     Enums: {
