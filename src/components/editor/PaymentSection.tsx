@@ -2,20 +2,20 @@ import { useState, useRef } from 'react';
 import { Upload, Check, Clock, AlertCircle, QrCode, Copy } from 'lucide-react';
 import { Resume, PLANS } from '@/types/resume';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/store/settingsStore';
 
 interface PaymentSectionProps {
   resume: Resume;
   onUploadReceipt: (url: string) => void;
 }
 
-const PIX_KEY = 'pix@curriculopro.com.br';
-
 export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps) {
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const settings = useSettingsStore((state) => state.settings);
 
-  const plan = PLANS[resume.plan];
+  const plan = { ...PLANS[resume.plan], ...settings.plans[resume.plan] };
   const isPending = resume.paymentStatus === 'pending';
   const isReceiptSent = resume.paymentStatus === 'receipt_sent';
   const isConfirmed = resume.paymentStatus === 'confirmed';
@@ -36,7 +36,7 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
   };
 
   const copyPixKey = async () => {
-    await navigator.clipboard.writeText(PIX_KEY);
+    await navigator.clipboard.writeText(plan.pixKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -76,19 +76,17 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
       {isPending && (
         <>
           <div className="flex flex-col items-center gap-4 py-4">
-            <div className="w-40 h-40 bg-secondary rounded-xl flex items-center justify-center">
-              <QrCode className="w-20 h-20 text-muted-foreground" />
-            </div>
+            {plan.qrCodeImageUrl ? <img src={plan.qrCodeImageUrl} alt={`QR Code Pix do plano ${plan.name}`} className="h-40 w-40 rounded-xl object-contain" /> : <div className="flex h-40 w-40 flex-col items-center justify-center gap-2 rounded-xl bg-secondary p-3 text-center"><QrCode className="h-12 w-12 text-muted-foreground" /><span className="break-all text-xs text-muted-foreground">{plan.pixKey || 'Chave Pix não cadastrada'}</span></div>}
             <p className="text-xs text-muted-foreground text-center">
               Escaneie o QR Code ou use a chave Pix abaixo
             </p>
           </div>
 
           <div className="bg-secondary/50 p-4 rounded-xl">
-            <p className="text-xs text-muted-foreground mb-2">Chave Pix (E-mail)</p>
+            <p className="text-xs text-muted-foreground mb-2">Chave Pix ({plan.pixKeyType}){plan.accountHolder && ` · ${plan.accountHolder}`}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-card px-3 py-2 rounded-lg text-sm font-mono text-foreground">
-                {PIX_KEY}
+                {plan.pixKey || 'Chave Pix não cadastrada'}
               </code>
               <button
                 onClick={copyPixKey}
@@ -101,6 +99,8 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
               </button>
             </div>
           </div>
+
+          {settings.supportPhone && <a href={`https://wa.me/${settings.supportPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Segue meu comprovante de pagamento para o plano ${plan.name}, ID do currículo: ${resume.id}`)}`} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl border border-[#25D366] py-3 text-center font-semibold text-[#128C45] transition-colors hover:bg-green-50">Enviar Comprovante pelo WhatsApp</a>}
 
           <div>
             <input

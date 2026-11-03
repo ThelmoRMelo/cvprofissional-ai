@@ -4,6 +4,7 @@ import { Plan, PLANS } from '@/types/resume';
 import { useResumeStore } from '@/store/resumeStore';
 import { useTemplateStore } from '@/store/templateStore';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/store/settingsStore';
 
 const planOrder: Plan[] = ['basic', 'intermediate', 'professional'];
 
@@ -17,6 +18,7 @@ export function PricingSection() {
   const navigate = useNavigate();
   const createResume = useResumeStore((state) => state.createResume);
   const templates = useTemplateStore((state) => state.templates);
+  const settings = useSettingsStore((state) => state.settings);
 
   const handleSelectPlan = (plan: Plan) => {
     const resume = createResume(plan);
@@ -49,7 +51,7 @@ export function PricingSection() {
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {planOrder.map((planKey, index) => {
-            const plan = PLANS[planKey];
+            const plan = { ...PLANS[planKey], price: settings.plans[planKey].price };
             const style = planStyles[planKey];
             const isFeatured = planKey === 'professional';
             const planTemplates = getTemplatesForPlan(planKey);
@@ -87,9 +89,8 @@ export function PricingSection() {
                   )}>
                     <span className="text-sm">R$</span>
                     <span className="text-5xl font-display font-bold">
-                      {plan.price.toFixed(0)}
+                      {plan.price.toFixed(2).replace('.', ',')}
                     </span>
-                    <span className="text-2xl font-display font-bold">,00</span>
                   </div>
                 </div>
 

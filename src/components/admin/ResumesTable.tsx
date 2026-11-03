@@ -1,7 +1,8 @@
-import { Eye, Check, ExternalLink, FileText } from 'lucide-react';
+import { Eye, Check, ExternalLink, FileText, MessageCircle } from 'lucide-react';
 import { Resume, PLANS, PaymentStatus } from '@/types/resume';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/store/settingsStore';
 
 interface ResumesTableProps {
   resumes: Resume[];
@@ -18,6 +19,7 @@ export function ResumesTable({
   onConfirmPayment, 
   onToggleDownload 
 }: ResumesTableProps) {
+  const settings = useSettingsStore((state) => state.settings);
   const filteredResumes = resumes.filter((r) =>
     filter === 'all' ? true : r.paymentStatus === filter
   );
@@ -100,7 +102,7 @@ export function ResumesTable({
                         resume.plan === 'intermediate' && 'bg-blue-100 text-blue-700',
                         resume.plan === 'professional' && 'bg-accent/10 text-accent'
                       )}>
-                        {PLANS[resume.plan].name} - R$ {PLANS[resume.plan].price.toFixed(2)}
+                        {PLANS[resume.plan].name} - R$ {settings.plans[resume.plan].price.toFixed(2).replace('.', ',')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground capitalize">
@@ -142,6 +144,7 @@ export function ResumesTable({
                           Confirmar
                         </button>
                       )}
+                      {resume.personalData.phone && <a href={`https://wa.me/${resume.personalData.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${resume.clientName || resume.personalData.fullName || ''}, tudo bem?`)}`} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600"><MessageCircle className="h-4 w-4" />Chamar no WhatsApp</a>}
                     </td>
                   </tr>
                 ))}

@@ -16,12 +16,6 @@ export function Header() {
           <a href="#planos" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors text-sm font-medium">
             Planos
           </a>
-          <Link
-            to="/admin"
-            className="text-primary-foreground/80 hover:text-primary-foreground transition-colors text-sm font-medium"
-          >
-            Admin
-          </Link>
         </nav>
       </div>
     </header>

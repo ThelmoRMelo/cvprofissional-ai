@@ -1,6 +1,8 @@
 import { ArrowRight } from 'lucide-react';
+import { useSettingsStore } from '@/store/settingsStore';
 
 export function HeroSection() {
+  const settings = useSettingsStore((state) => state.settings);
   const scrollToPlans = () => {
     document.getElementById('planos')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -17,18 +19,15 @@ export function HeroSection() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-accent/20 text-accent-foreground px-4 py-2 rounded-full text-sm font-medium mb-6 animate-fade-in">
             <span className="w-2 h-2 bg-accent rounded-full animate-pulse-soft" />
-            Currículo profissional em minutos
+            {settings.heroBadge}
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-primary-foreground mb-6 leading-tight animate-fade-in">
-            Crie seu currículo{' '}
-            <span className="text-accent">profissional</span>{' '}
-            em minutos
+            {settings.heroTitle}
           </h1>
 
           <p className="text-lg md:text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '100ms' }}>
-            Construa um currículo impressionante com nossa ferramenta simples e intuitiva. 
-            Preencha seus dados, escolha um modelo e baixe após a confirmação do pagamento.
+            {settings.heroSubtitle}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '200ms' }}>
@@ -36,7 +35,7 @@ export function HeroSection() {
               onClick={scrollToPlans}
               className="btn-hero inline-flex items-center justify-center gap-2 group"
             >
-              Ver planos
+              {settings.heroButtonText}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

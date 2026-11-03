@@ -8,6 +8,7 @@ import { TemplateSelector } from '@/components/editor/TemplateSelector';
 import { PaymentSection } from '@/components/editor/PaymentSection';
 import { PLANS, ResumeTemplate } from '@/types/resume';
 import { cn } from '@/lib/utils';
+import { WhatsAppFloatingButton } from '@/components/public/WhatsAppFloatingButton';
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
@@ -165,6 +166,7 @@ export default function Editor() {
           </div>
         </div>
       </div>
+      <WhatsAppFloatingButton />
     </div>
   );
 }
