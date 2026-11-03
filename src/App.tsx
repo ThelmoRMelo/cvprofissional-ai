@@ -7,8 +7,13 @@ import Index from "./pages/Index";
 import Editor from "./pages/Editor";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import { useSettingsStore } from "./store/settingsStore";
+import { useTemplateStore } from "./store/templateStore";
 
 const queryClient = new QueryClient();
+
+void useSettingsStore.getState().loadFromCloud();
+void useTemplateStore.getState().loadFromCloud();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
