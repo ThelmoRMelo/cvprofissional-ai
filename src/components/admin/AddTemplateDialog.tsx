@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Upload, Loader2, Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { Plan, PLANS } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -36,20 +36,37 @@ interface AddTemplateDialogProps {
   }) => void;
 }
 
-const ACCEPTED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/bmp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const isValidFileType = (file: File): boolean => {
+  if (file.type) {
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') return true;
+  }
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  return ['jpg', 'jpeg', 'png', 'bmp', 'webp', 'heic', 'pdf'].includes(ext);
+};
 
 const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<{ base64: string; mimeType: string; blob: Blob }> => {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('image/')) {
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const extensionMimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', bmp: 'image/bmp',
+      webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf',
+    };
+    const mimeType = file.type || extensionMimeTypes[extension] || 'application/octet-stream';
+    const isImage = mimeType.startsWith('image/');
+    const resolveOriginal = () => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve({ base64, mimeType: file.type, blob: file });
+        resolve({ base64: result.split(',')[1], mimeType, blob: file });
       };
       reader.onerror = reject;
       reader.readAsDataURL(file);
+    };
+
+    if (!isImage) {
+      resolveOriginal();
       return;
     }
 
@@ -96,7 +113,8 @@ const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('Falha ao carregar imagem para compressão'));
+      // Preserve formats the browser cannot decode (for example, HEIC on older mobile browsers).
+      resolveOriginal();
     };
     img.src = url;
   });
@@ -112,8 +130,6 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     return () => {
       if (previewImage.startsWith('blob:')) URL.revokeObjectURL(previewImage);
@@ -121,29 +137,33 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
   }, [previewImage]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-      toast.error('Formato inválido. Aceitos: PDF, JPG, PNG, BMP');
+    if (!isValidFileType(file)) {
+      toast.error('Formato inválido. Aceitos: JPG, PNG, WEBP, BMP ou PDF');
+      input.value = '';
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
       toast.error('Arquivo muito grande. Máximo: 10MB');
+      input.value = '';
       return;
     }
 
     setReferenceFile(file);
 
     // Use an object URL for preview to avoid keeping a large Base64 string in memory.
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/') || !file.name.toLowerCase().endsWith('.pdf')) {
       setPreviewImage(URL.createObjectURL(file));
     } else {
       setPreviewImage('');
     }
 
     toast.success(`Arquivo "${file.name}" selecionado`);
+    input.value = '';
   };
 
   const handleGenerate = async () => {
@@ -252,9 +272,8 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
-        onPointerDownOutside={(event) => {
-          if (isGenerating) event.preventDefault();
-        }}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => {
           if (isGenerating) event.preventDefault();
         }}
@@ -309,23 +328,21 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
                 className="flex-1"
                 disabled={isGenerating}
               />
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                accept=".pdf,.jpg,.jpeg,.png,.bmp"
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isGenerating}
-                className="gap-2"
+              <label
+                htmlFor="template-file-upload"
+                className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground ${isGenerating ? 'pointer-events-none opacity-50' : ''}`}
               >
                 <Upload className="w-4 h-4" />
                 Upload
-              </Button>
+                <input
+                  id="template-file-upload"
+                  type="file"
+                  accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.bmp,.webp,.heic"
+                  onChange={handleFileSelect}
+                  disabled={isGenerating}
+                  className="sr-only"
+                />
+              </label>
             </div>
             <p className="text-xs text-muted-foreground">
               Aceita: PDF, JPG, PNG, BMP (máx. 10MB). O arquivo será usado como referência visual para a IA.
