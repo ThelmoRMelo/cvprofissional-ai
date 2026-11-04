@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 480" role="img" aria-label="Prévia de currículo básico essencial">
+  <rect width="360" height="480" fill="#fff"/>
+  <rect x="30" y="28" width="300" height="6" rx="3" fill="#17324d"/>
+  <text x="32" y="70" font-family="Arial,sans-serif" font-size="23" font-weight="700" fill="#17324d">NOME COMPLETO</text>
+  <text x="32" y="91" font-family="Arial,sans-serif" font-size="10" fill="#64748b">email@exemplo.com  ·  (00) 00000-0000</text>
+  <path d="M32 108h296" stroke="#d8e0e8" stroke-width="2"/>
+  <g font-family="Arial,sans-serif" fill="#223244"><text x="32" y="137" font-size="12" font-weight="700">OBJETIVO</text><rect x="32" y="147" width="260" height="5" rx="2" fill="#cbd5e1"/><rect x="32" y="157" width="230" height="5" rx="2" fill="#e2e8f0"/><text x="32" y="194" font-size="12" font-weight="700">EXPERIÊNCIA</text><text x="32" y="214" font-size="11" font-weight="700">Cargo · Empresa</text><rect x="32" y="222" width="200" height="4" rx="2" fill="#94a3b8"/><rect x="32" y="232" width="285" height="5" rx="2" fill="#e2e8f0"/><rect x="32" y="242" width="270" height="5" rx="2" fill="#e2e8f0"/><text x="32" y="280" font-size="12" font-weight="700">FORMAÇÃO</text><text x="32" y="300" font-size="11" font-weight="700">Curso · Instituição</text><rect x="32" y="308" width="160" height="4" rx="2" fill="#94a3b8"/><text x="32" y="348" font-size="12" font-weight="700">HABILIDADES</text><rect x="32" y="360" width="70" height="19" rx="9" fill="#e8eef4"/><rect x="110" y="360" width="85" height="19" rx="9" fill="#e8eef4"/><rect x="203" y="360" width="75" height="19" rx="9" fill="#e8eef4"/></g>
+</svg>

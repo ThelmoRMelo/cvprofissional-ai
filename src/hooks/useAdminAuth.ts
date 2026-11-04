@@ -26,7 +26,7 @@ export function useAdminAuth() {
       setLoading(false);
       if (data) {
         // Admin sees inactive templates too; push local settings if cloud is empty
-        await useTemplateStore.getState().loadFromCloud();
+        await useTemplateStore.getState().loadFromCloud(true);
         await useSettingsStore.getState().loadFromCloud();
       }
     }, 0);
