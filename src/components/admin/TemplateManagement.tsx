@@ -23,15 +23,17 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { AddTemplateDialog } from './AddTemplateDialog';
+import { toast } from 'sonner';
 
 interface TemplateManagementProps {
   onBack: () => void;
   initialShowAdd?: boolean;
+  isOnline?: boolean;
 }
 
-export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateManagementProps) {
+export function TemplateManagement({ onBack, initialShowAdd = false, isOnline = true }: TemplateManagementProps) {
   const { templates, addTemplate, updateTemplate, deleteTemplate, toggleTemplateActive } = useTemplateStore();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(initialShowAdd);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(initialShowAdd && isOnline);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateModel | null>(null);
   const [formData, setFormData] = useState({
@@ -47,10 +49,18 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
   );
 
   const handleOpenAddDialog = () => {
+    if (!isOnline) {
+      toast.warning('Ação indisponível enquanto estiver offline.');
+      return;
+    }
     setIsAddDialogOpen(true);
   };
 
   const handleOpenEditDialog = (template: TemplateModel) => {
+    if (!isOnline) {
+      toast.warning('Ação indisponível enquanto estiver offline.');
+      return;
+    }
     setEditingTemplate(template);
     setFormData({
       name: template.name,
@@ -62,10 +72,18 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
   };
 
   const handleTemplateCreated = (templateData: Omit<TemplateModel, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!isOnline) {
+      toast.warning('Ação indisponível enquanto estiver offline.');
+      return;
+    }
     addTemplate(templateData);
   };
 
   const handleSaveEdit = () => {
+    if (!isOnline) {
+      toast.warning('Ação indisponível enquanto estiver offline.');
+      return;
+    }
     if (!formData.name || !editingTemplate) return;
     updateTemplate(editingTemplate.id, formData);
     setIsEditDialogOpen(false);
@@ -73,6 +91,10 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
   };
 
   const handleDelete = (id: string) => {
+    if (!isOnline) {
+      toast.warning('Ação indisponível enquanto estiver offline.');
+      return;
+    }
     if (confirm('Tem certeza que deseja excluir este modelo?')) {
       deleteTemplate(id);
     }
@@ -93,6 +115,11 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
 
   return (
     <div className="space-y-6">
+      {!isOnline && (
+        <div role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-200">
+          Você está offline. A criação, edição e exclusão de modelos exigem conexão com a nuvem.
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -112,7 +139,7 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
             </p>
           </div>
         </div>
-        <Button onClick={handleOpenAddDialog} className="gap-2">
+        <Button onClick={handleOpenAddDialog} disabled={!isOnline} title={!isOnline ? 'Ação indisponível offline' : undefined} className="gap-2">
           <Plus className="w-4 h-4" />
           Adicionar modelo
         </Button>
@@ -159,7 +186,9 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
               <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
                   onClick={() => handleOpenEditDialog(template)}
-                  className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"
+                  disabled={!isOnline}
+                  title={!isOnline ? 'Ação indisponível offline' : undefined}
+                  className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Edit className="w-4 h-4 text-primary" />
                 </button>
@@ -171,7 +200,9 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
                 </button>
                 <button
                   onClick={() => handleDelete(template.id)}
-                  className="p-2 bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
+                  disabled={!isOnline}
+                  title={!isOnline ? 'Ação indisponível offline' : undefined}
+                  className="p-2 bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4 text-white" />
                 </button>
@@ -196,6 +227,8 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
                 <Switch
                   checked={template.isActive}
                   onCheckedChange={() => toggleTemplateActive(template.id)}
+                  disabled={!isOnline}
+                  title={!isOnline ? 'Ação indisponível offline' : undefined}
                 />
               </div>
             </div>
@@ -205,7 +238,9 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
         {/* Add New Card */}
         <button
           onClick={handleOpenAddDialog}
-          className="aspect-[3/4] bg-secondary/50 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-accent hover:bg-secondary transition-all group"
+          disabled={!isOnline}
+          title={!isOnline ? 'Ação indisponível offline' : undefined}
+          className="aspect-[3/4] bg-secondary/50 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-accent hover:bg-secondary transition-all group disabled:cursor-not-allowed disabled:opacity-50"
         >
           <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
             <Plus className="w-8 h-8 text-accent" />
@@ -292,7 +327,7 @@ export function TemplateManagement({ onBack, initialShowAdd = false }: TemplateM
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit} disabled={!formData.name}>
+            <Button onClick={handleSaveEdit} disabled={!isOnline || !formData.name} title={!isOnline ? 'Ação indisponível offline' : undefined}>
               Salvar alterações
             </Button>
           </DialogFooter>
