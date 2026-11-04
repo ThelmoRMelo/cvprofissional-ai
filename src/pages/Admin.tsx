@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useResumeStore } from '@/store/resumeStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { type PaymentStatus, type Plan } from '@/types/resume';
@@ -7,6 +7,9 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { StatsCards } from '@/components/admin/StatsCards';
 import { ResumesTable } from '@/components/admin/ResumesTable';
 import { TemplateManagement } from '@/components/admin/TemplateManagement';
+import { fetchResumesFromCloud, updateResumeCloud } from '@/lib/resumeCloud';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const tabs = ['Visão Geral & Currículos', 'Modelos de Currículo', 'QR Codes & Pagamentos Pix', 'Conteúdo do Site (CMS)', 'Atendimento & WhatsApp'] as const;
 type Tab = typeof tabs[number];
@@ -14,13 +17,59 @@ const plans: Plan[] = ['basic', 'intermediate', 'professional'];
 const planNames: Record<Plan, string> = { basic: 'Básico', intermediate: 'Intermediário', professional: 'Profissional' };
 
 export default function Admin() {
-  const { resumes, updatePaymentStatus, toggleDownloadEnabled } = useResumeStore();
+  const { resumes, updatePaymentStatus, toggleDownloadEnabled, replaceResumes } = useResumeStore();
   const { settings, updateSettings, updatePlanConfig, setAdminPin } = useSettingsStore();
   const [authenticated, setAuthenticated] = useState(() => sessionStorage.getItem('admin_authenticated') === 'true');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [tab, setTab] = useState<Tab>(tabs[0]);
   const [filter, setFilter] = useState<PaymentStatus | 'all'>('all');
+
+  useEffect(() => {
+    if (!authenticated) return;
+    let active = true;
+    let hasLoaded = false;
+    const loadResumes = async (reportError = false) => {
+      try {
+        const remoteResumes = await fetchResumesFromCloud();
+        if (active) {
+          replaceResumes(remoteResumes);
+          hasLoaded = true;
+        }
+      } catch (error) {
+        console.error('Falha ao carregar currículos da nuvem:', error);
+        if (active && reportError && !hasLoaded) toast.error('Não foi possível acessar a nuvem. Exibindo os dados salvos neste dispositivo.');
+      }
+    };
+    void loadResumes(true);
+    const channel = (supabase as any).channel('admin-resumes').on('postgres_changes', { event: '*', schema: 'public', table: 'resumes' }, () => { void loadResumes(); }).subscribe();
+    const interval = window.setInterval(() => { void loadResumes(); }, 15000);
+    return () => { active = false; window.clearInterval(interval); void supabase.removeChannel(channel); };
+  }, [authenticated, replaceResumes]);
+
+  const confirmPayment = async (id: string) => {
+    updatePaymentStatus(id, 'confirmed');
+    try {
+      await updateResumeCloud(id, { paymentStatus: 'confirmed' });
+      toast.success('Pagamento confirmado.');
+    } catch (error) {
+      console.error('Falha ao confirmar pagamento na nuvem:', error);
+      toast.error('A confirmação foi mantida localmente, mas não foi sincronizada.');
+    }
+  };
+  const toggleDownload = async (id: string) => {
+    const resume = useResumeStore.getState().resumes.find((item) => item.id === id);
+    if (!resume || resume.paymentStatus !== 'confirmed') return;
+    const enabled = !resume.downloadEnabled;
+    toggleDownloadEnabled(id);
+    try {
+      await updateResumeCloud(id, { downloadEnabled: enabled });
+      toast.success(enabled ? 'Download liberado.' : 'Download bloqueado.');
+    } catch (error) {
+      console.error('Falha ao atualizar liberação de download na nuvem:', error);
+      toast.error('A alteração foi mantida localmente, mas não foi sincronizada.');
+    }
+  };
 
   const login = (event: FormEvent) => {
     event.preventDefault();
@@ -42,7 +91,7 @@ export default function Admin() {
   if (!authenticated) return <main className="flex min-h-screen items-center justify-center bg-secondary/40 px-4"><form onSubmit={login} className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-8 shadow-lg"><div className="text-center"><div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">CV</div><h1 className="text-2xl font-bold text-foreground">Acesso administrativo</h1><p className="mt-2 text-sm text-muted-foreground">Digite seu PIN de 4 a 6 dígitos.</p></div><input autoFocus inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} className="w-full rounded-lg border border-input bg-background px-4 py-3 text-center text-2xl tracking-[0.5em]" placeholder="••••" aria-label="PIN administrativo" required />{pinError && <p role="alert" className="text-center text-sm text-destructive">{pinError}</p>}<button className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground">Entrar</button></form></main>;
 
   return <div className="min-h-screen bg-background"><AdminHeader title="Painel Administrativo" onLogout={logout} /><main className="container mx-auto space-y-6 px-4 py-8"><nav className="flex gap-2 overflow-x-auto pb-2" aria-label="Seções administrativas">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === item ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>{item}</button>)}</nav>
-    {tab === tabs[0] && <div className="space-y-7"><section><h2 className="mb-4 text-xl font-semibold">Métricas</h2><StatsCards stats={stats} onCardClick={(value) => setFilter(value)} activeFilter={filter} /></section><section id="resumes-table"><h2 className="mb-4 text-xl font-semibold">Currículos e pagamentos</h2><ResumesTable resumes={resumes} filter={filter} onFilterChange={setFilter} onConfirmPayment={(id) => updatePaymentStatus(id, 'confirmed')} onToggleDownload={toggleDownloadEnabled} /></section></div>}
+    {tab === tabs[0] && <div className="space-y-7"><section><h2 className="mb-4 text-xl font-semibold">Métricas</h2><StatsCards stats={stats} onCardClick={(value) => setFilter(value)} activeFilter={filter} /></section><section id="resumes-table"><h2 className="mb-4 text-xl font-semibold">Currículos e pagamentos</h2><ResumesTable resumes={resumes} filter={filter} onFilterChange={setFilter} onConfirmPayment={confirmPayment} onToggleDownload={toggleDownload} /></section></div>}
     {tab === tabs[1] && <TemplateManagement onBack={() => setTab(tabs[0])} />}
     {tab === tabs[2] && <section className="space-y-5"><div><h2 className="text-2xl font-bold">QR Codes & pagamentos Pix</h2><p className="text-sm text-muted-foreground">Cada plano possui seu próprio preço e dados Pix.</p></div><div className="grid gap-5 lg:grid-cols-3">{plans.map((plan) => <PlanPaymentForm key={plan} plan={plan} value={settings.plans[plan]} onChange={(value) => updatePlanConfig(plan, value)} />)}</div></section>}
     {tab === tabs[3] && <SettingsForm settings={settings} onChange={updateSettings} setAdminPin={setAdminPin} />}

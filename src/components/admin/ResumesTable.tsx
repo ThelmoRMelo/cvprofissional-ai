@@ -3,6 +3,9 @@ import { Resume, PLANS, PaymentStatus } from '@/types/resume';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useState } from 'react';
+import { UserRound } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ResumesTableProps {
   resumes: Resume[];
@@ -20,6 +23,7 @@ export function ResumesTable({
   onToggleDownload 
 }: ResumesTableProps) {
   const settings = useSettingsStore((state) => state.settings);
+  const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const filteredResumes = resumes.filter((r) =>
     filter === 'all' ? true : r.paymentStatus === filter
   );
@@ -145,6 +149,7 @@ export function ResumesTable({
                         </button>
                       )}
                       {resume.personalData.phone && <a href={`https://wa.me/${resume.personalData.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${resume.clientName || resume.personalData.fullName || ''}, tudo bem?`)}`} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-3 py-1.5 text-sm font-medium text-white hover:bg-green-600"><MessageCircle className="h-4 w-4" />Chamar no WhatsApp</a>}
+                      <button onClick={() => setSelectedResume(resume)} className="ml-2 inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-secondary"><UserRound className="h-4 w-4" />Dados</button>
                     </td>
                   </tr>
                 ))}
@@ -153,6 +158,19 @@ export function ResumesTable({
           </div>
         )}
       </div>
+      <Dialog open={Boolean(selectedResume)} onOpenChange={(open) => { if (!open) setSelectedResume(null); }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          {selectedResume && <>
+            <DialogHeader><DialogTitle>Dados do currículo · {selectedResume.personalData.fullName || selectedResume.clientName || selectedResume.id}</DialogTitle></DialogHeader>
+            <div className="space-y-5 text-sm">
+              <section><h3 className="mb-2 font-semibold">Dados pessoais</h3><dl className="grid gap-2 sm:grid-cols-2">{Object.entries(selectedResume.personalData).map(([label, value]) => value && <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>)}</dl><p className="mt-2 text-muted-foreground">Currículo: {selectedResume.id}</p></section>
+              <section><h3 className="mb-2 font-semibold">Experiência profissional</h3>{selectedResume.experiences.length ? selectedResume.experiences.map((item) => <article key={item.id} className="mb-3 rounded-lg bg-secondary/50 p-3"><p className="font-medium">{item.position} · {item.company}</p><p className="text-muted-foreground">{item.startDate} — {item.current ? 'Atual' : item.endDate}</p><p className="mt-1 whitespace-pre-wrap">{item.description}</p></article>) : <p className="text-muted-foreground">Nenhuma experiência cadastrada.</p>}</section>
+              <section><h3 className="mb-2 font-semibold">Formação</h3>{selectedResume.education.length ? selectedResume.education.map((item) => <article key={item.id} className="mb-2 rounded-lg bg-secondary/50 p-3"><p className="font-medium">{item.degree}{item.field && ` · ${item.field}`}</p><p>{item.institution}</p><p className="text-muted-foreground">{item.startDate} — {item.current ? 'Atual' : item.endDate}</p></article>) : <p className="text-muted-foreground">Nenhuma formação cadastrada.</p>}</section>
+              <section><h3 className="mb-2 font-semibold">Habilidades</h3>{selectedResume.skills.length ? <ul className="flex flex-wrap gap-2">{selectedResume.skills.map((item) => <li key={item.id} className="rounded-full bg-secondary px-3 py-1">{item.name} · {item.level}</li>)}</ul> : <p className="text-muted-foreground">Nenhuma habilidade cadastrada.</p>}</section>
+            </div>
+          </>}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

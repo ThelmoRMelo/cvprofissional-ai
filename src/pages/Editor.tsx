@@ -6,14 +6,17 @@ import { ResumeForm } from '@/components/editor/ResumeForm';
 import { ResumePreview } from '@/components/editor/ResumePreview';
 import { TemplateSelector } from '@/components/editor/TemplateSelector';
 import { PaymentSection } from '@/components/editor/PaymentSection';
-import { PLANS, ResumeTemplate } from '@/types/resume';
+import { PLANS, ResumeTemplate, type Resume } from '@/types/resume';
 import { cn } from '@/lib/utils';
 import { WhatsAppFloatingButton } from '@/components/public/WhatsAppFloatingButton';
+import { fetchResumeFromCloud, upsertResumeToCloud } from '@/lib/resumeCloud';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { resumes, currentResume, setCurrentResume, updateResume, updatePaymentStatus } = useResumeStore();
+  const { resumes, currentResume, setCurrentResume, updateResume, updatePaymentStatus, applyRemoteUpdate } = useResumeStore();
 
   useEffect(() => {
     // Block printing
@@ -34,17 +37,53 @@ export default function Editor() {
   }, []);
 
   useEffect(() => {
-    if (id) {
-      const resume = resumes.find((r) => r.id === id);
-      if (resume) {
-        setCurrentResume(resume);
-      } else {
-        navigate('/');
+    if (!id) return;
+    let active = true;
+    const localResume = useResumeStore.getState().resumes.find((resume) => resume.id === id);
+    if (localResume) setCurrentResume(localResume);
+    void fetchResumeFromCloud(id).then((cloudResume) => {
+      if (!active) return;
+      if (!cloudResume) {
+        if (localResume) void upsertResumeToCloud(localResume).catch((error) => console.warn('Rascunho local ainda não sincronizado:', error));
+        else navigate('/');
+        return;
       }
-    }
-  }, [id, resumes, setCurrentResume, navigate]);
+      const latestLocalResume = useResumeStore.getState().resumes.find((resume) => resume.id === id) ?? localResume;
+      const localIsNewer = latestLocalResume && new Date(latestLocalResume.updatedAt).getTime() > cloudResume.updatedAt.getTime();
+      if (localIsNewer) {
+        void upsertResumeToCloud(latestLocalResume).catch((error) => console.warn('Não foi possível sincronizar o rascunho local:', error));
+        setCurrentResume(latestLocalResume);
+      } else {
+        applyRemoteUpdate(id, cloudResume);
+        setCurrentResume(cloudResume);
+      }
+    }).catch((error) => {
+      console.warn('Falha ao carregar currículo da nuvem; usando o rascunho local:', error);
+      if (active && !localResume) navigate('/');
+    });
+    return () => { active = false; };
+  }, [id, setCurrentResume, applyRemoteUpdate, navigate]);
 
-  if (!currentResume) {
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    const refreshStatus = async () => {
+      try {
+        const remoteResume = await fetchResumeFromCloud(id);
+        if (active && remoteResume) applyRemoteUpdate(id, { paymentStatus: remoteResume.paymentStatus, downloadEnabled: remoteResume.downloadEnabled, receiptUrl: remoteResume.receiptUrl });
+      } catch (error) {
+        console.warn('Falha ao atualizar o status do currículo:', error);
+      }
+    };
+    const channel = (supabase as any).channel(`resume-status-${id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'resumes', filter: `id=eq.${id}` }, (payload: { new: { payment_status?: Resume['paymentStatus']; download_enabled?: boolean; receipt_url?: string | null } }) => {
+      const row = payload.new as { payment_status?: Resume['paymentStatus']; download_enabled?: boolean; receipt_url?: string | null };
+      applyRemoteUpdate(id, { paymentStatus: row.payment_status, downloadEnabled: row.download_enabled, receiptUrl: row.receipt_url ?? undefined });
+    }).subscribe();
+    const interval = window.setInterval(() => { void refreshStatus(); }, 15000);
+    return () => { active = false; window.clearInterval(interval); void supabase.removeChannel(channel); };
+  }, [id, applyRemoteUpdate]);
+
+  if (!currentResume || currentResume.id !== id) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Carregando...</p>
@@ -63,8 +102,11 @@ export default function Editor() {
     updateResume(currentResume.id, { template });
   };
 
-  const handleUploadReceipt = (url: string) => {
+  const handleUploadReceipt = async (url: string) => {
     updatePaymentStatus(currentResume.id, 'receipt_sent', url);
+    const updatedResume = useResumeStore.getState().resumes.find((resume) => resume.id === currentResume.id);
+    if (updatedResume) await upsertResumeToCloud(updatedResume);
+    toast.success('Comprovante enviado com sucesso.');
   };
 
   const handleDownload = () => {

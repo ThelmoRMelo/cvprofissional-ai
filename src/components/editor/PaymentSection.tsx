@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
-import { Upload, Check, Clock, AlertCircle, QrCode, Copy } from 'lucide-react';
+import { Upload, Check, Clock, AlertCircle, QrCode, Copy, LoaderCircle } from 'lucide-react';
 import { Resume, PLANS } from '@/types/resume';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
+import { uploadReceipt } from '@/lib/resumeCloud';
+import { toast } from 'sonner';
 
 interface PaymentSectionProps {
   resume: Resume;
-  onUploadReceipt: (url: string) => void;
+  onUploadReceipt: (url: string) => Promise<void>;
 }
 
 export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps) {
@@ -24,15 +26,22 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      toast.error('Envie uma imagem ou um arquivo PDF.');
+      e.target.value = '';
+      return;
+    }
     setUploading(true);
-    
-    // Simulate upload - in production, this would upload to storage
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    // Create a fake URL for demonstration
-    const fakeUrl = URL.createObjectURL(file);
-    onUploadReceipt(fakeUrl);
-    setUploading(false);
+    try {
+      const publicUrl = await uploadReceipt(file, resume.id);
+      await onUploadReceipt(publicUrl);
+    } catch (error) {
+      console.error('Falha no envio do comprovante:', error);
+      toast.error('Não foi possível enviar o comprovante. Seu currículo continua salvo neste dispositivo.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
   };
 
   const copyPixKey = async () => {
@@ -119,7 +128,7 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
                 uploading && 'opacity-50 cursor-not-allowed'
               )}
             >
-              <Upload className="w-4 h-4" />
+              {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {uploading ? 'Enviando...' : 'Enviar comprovante de pagamento'}
             </button>
           </div>

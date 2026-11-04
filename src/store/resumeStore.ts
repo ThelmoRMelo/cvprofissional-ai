@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Resume, Plan, PaymentStatus, ResumeTemplate } from '@/types/resume';
+import { upsertResumeToCloud } from '@/lib/resumeCloud';
 
 interface ResumeState {
   resumes: Resume[];
@@ -13,9 +14,23 @@ interface ResumeState {
   getResumeById: (id: string) => Resume | undefined;
   updatePaymentStatus: (id: string, status: PaymentStatus, receiptUrl?: string) => void;
   toggleDownloadEnabled: (id: string) => void;
+  replaceResumes: (resumes: Resume[]) => void;
+  applyRemoteUpdate: (id: string, data: Partial<Resume>) => void;
 }
 
-const generateId = () => Math.random().toString(36).substr(2, 9);
+const generateId = () => globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+  const random = Math.random() * 16 | 0;
+  return (char === 'x' ? random : (random & 0x3 | 0x8)).toString(16);
+});
+const syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const queueCloudSync = (resume: Resume) => {
+  const existing = syncTimers.get(resume.id);
+  if (existing) clearTimeout(existing);
+  syncTimers.set(resume.id, setTimeout(() => {
+    syncTimers.delete(resume.id);
+    void upsertResumeToCloud(resume).catch((error) => console.warn('Currículo mantido localmente; falha ao sincronizar com a nuvem:', error));
+  }, 600));
+};
 
 const createEmptyResume = (plan: Plan): Resume => ({
   id: generateId(),
@@ -51,10 +66,13 @@ export const useResumeStore = create<ResumeState>()(
           resumes: [...state.resumes, newResume],
           currentResume: newResume,
         }));
+        queueCloudSync(newResume);
         return newResume;
       },
 
       updateResume: (id: string, data: Partial<Resume>) => {
+        const existingResume = get().resumes.find((resume) => resume.id === id);
+        const updatedResume = existingResume ? { ...existingResume, ...data, updatedAt: new Date() } : null;
         set((state) => ({
           resumes: state.resumes.map((r) =>
             r.id === id ? { ...r, ...data, updatedAt: new Date() } : r
@@ -64,6 +82,7 @@ export const useResumeStore = create<ResumeState>()(
               ? { ...state.currentResume, ...data, updatedAt: new Date() }
               : state.currentResume,
         }));
+        if (updatedResume) queueCloudSync(updatedResume);
       },
 
       setCurrentResume: (resume) => set({ currentResume: resume }),
@@ -71,6 +90,8 @@ export const useResumeStore = create<ResumeState>()(
       getResumeById: (id: string) => get().resumes.find((r) => r.id === id),
 
       updatePaymentStatus: (id: string, status: PaymentStatus, receiptUrl?: string) => {
+        const existingResume = get().resumes.find((resume) => resume.id === id);
+        if (existingResume) queueCloudSync({ ...existingResume, paymentStatus: status, receiptUrl: receiptUrl || existingResume.receiptUrl, updatedAt: new Date() });
         set((state) => ({
           resumes: state.resumes.map((r) =>
             r.id === id
@@ -87,6 +108,7 @@ export const useResumeStore = create<ResumeState>()(
       toggleDownloadEnabled: (id: string) => {
         const resume = get().resumes.find((r) => r.id === id);
         if (resume && resume.paymentStatus === 'confirmed') {
+          queueCloudSync({ ...resume, downloadEnabled: !resume.downloadEnabled, updatedAt: new Date() });
           set((state) => ({
             resumes: state.resumes.map((r) =>
               r.id === id ? { ...r, downloadEnabled: !r.downloadEnabled, updatedAt: new Date() } : r
@@ -94,6 +116,17 @@ export const useResumeStore = create<ResumeState>()(
           }));
         }
       },
+
+      replaceResumes: (cloudResumes) => set((state) => {
+        const byId = new Map(state.resumes.map((resume) => [resume.id, resume]));
+        cloudResumes.forEach((resume) => byId.set(resume.id, resume));
+        return { resumes: [...byId.values()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) };
+      }),
+
+      applyRemoteUpdate: (id, data) => set((state) => ({
+        resumes: state.resumes.map((resume) => resume.id === id ? { ...resume, ...data } : resume),
+        currentResume: state.currentResume?.id === id ? { ...state.currentResume, ...data } : state.currentResume,
+      })),
     }),
     {
       name: 'resume-storage',
