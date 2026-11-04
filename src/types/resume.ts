@@ -41,12 +41,14 @@ export interface Skill {
 
 export interface Resume {
   id: string;
+  accessToken?: string;
   clientName: string;
   plan: Plan;
   template: ResumeTemplate;
   paymentStatus: PaymentStatus;
   downloadEnabled: boolean;
   receiptUrl?: string;
+  receiptPath?: string;
   personalData: PersonalData;
   experiences: Experience[];
   education: Education[];

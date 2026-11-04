@@ -9,8 +9,7 @@ import { AdminHeader } from '@/components/admin/AdminHeader';
 import { StatsCards } from '@/components/admin/StatsCards';
 import { ResumesTable } from '@/components/admin/ResumesTable';
 import { TemplateManagement } from '@/components/admin/TemplateManagement';
-import { fetchResumesFromCloud, updateResumeCloud } from '@/lib/resumeCloud';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchResumesForAdmin, updateResumeByAdmin } from '@/lib/resumeCloud';
 import { toast } from 'sonner';
 
 const tabs = ['Visão Geral & Currículos', 'Modelos de Currículo', 'QR Codes & Pagamentos Pix', 'Conteúdo do Site (CMS)', 'Atendimento & WhatsApp'] as const;
@@ -19,7 +18,7 @@ const plans: Plan[] = ['basic', 'intermediate', 'professional'];
 const planNames: Record<Plan, string> = { basic: 'Básico', intermediate: 'Intermediário', professional: 'Profissional' };
 
 export default function Admin() {
-  const { resumes, updatePaymentStatus, toggleDownloadEnabled, replaceResumes } = useResumeStore();
+  const { resumes, replaceResumes, applyRemoteUpdate } = useResumeStore();
   const { settings, updateSettings, updatePlanConfig, setAdminPin } = useSettingsStore();
   const { session, isAdmin, loading, adminExists } = useAdminAuth();
   const [email, setEmail] = useState('');
@@ -28,14 +27,15 @@ export default function Admin() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>(tabs[0]);
   const [filter, setFilter] = useState<PaymentStatus | 'all'>('all');
+  const isAuthenticatedAdmin = Boolean(session && isAdmin);
 
   useEffect(() => {
-    if (!authenticated) return;
+    if (!isAuthenticatedAdmin) return;
     let active = true;
     let hasLoaded = false;
     const loadResumes = async (reportError = false) => {
       try {
-        const remoteResumes = await fetchResumesFromCloud();
+        const remoteResumes = await fetchResumesForAdmin();
         if (active) {
           replaceResumes(remoteResumes);
           hasLoaded = true;
@@ -46,32 +46,32 @@ export default function Admin() {
       }
     };
     void loadResumes(true);
-    const channel = (supabase as any).channel('admin-resumes').on('postgres_changes', { event: '*', schema: 'public', table: 'resumes' }, () => { void loadResumes(); }).subscribe();
+    const channel = supabase.channel('admin-resumes').on('postgres_changes', { event: '*', schema: 'public', table: 'resumes' }, () => { void loadResumes(); }).subscribe();
     const interval = window.setInterval(() => { void loadResumes(); }, 15000);
     return () => { active = false; window.clearInterval(interval); void supabase.removeChannel(channel); };
-  }, [authenticated, replaceResumes]);
+  }, [isAuthenticatedAdmin, replaceResumes]);
 
   const confirmPayment = async (id: string) => {
-    updatePaymentStatus(id, 'confirmed');
     try {
-      await updateResumeCloud(id, { paymentStatus: 'confirmed' });
+      await updateResumeByAdmin(id, { paymentStatus: 'confirmed' });
+      applyRemoteUpdate(id, { paymentStatus: 'confirmed' });
       toast.success('Pagamento confirmado.');
     } catch (error) {
       console.error('Falha ao confirmar pagamento na nuvem:', error);
-      toast.error('A confirmação foi mantida localmente, mas não foi sincronizada.');
+      toast.error('Não foi possível confirmar o pagamento.');
     }
   };
   const toggleDownload = async (id: string) => {
     const resume = useResumeStore.getState().resumes.find((item) => item.id === id);
     if (!resume || resume.paymentStatus !== 'confirmed') return;
     const enabled = !resume.downloadEnabled;
-    toggleDownloadEnabled(id);
     try {
-      await updateResumeCloud(id, { downloadEnabled: enabled });
+      await updateResumeByAdmin(id, { downloadReleased: enabled });
+      applyRemoteUpdate(id, { downloadEnabled: enabled });
       toast.success(enabled ? 'Download liberado.' : 'Download bloqueado.');
     } catch (error) {
       console.error('Falha ao atualizar liberação de download na nuvem:', error);
-      toast.error('A alteração foi mantida localmente, mas não foi sincronizada.');
+      toast.error('Não foi possível atualizar a liberação do download.');
     }
   };
 

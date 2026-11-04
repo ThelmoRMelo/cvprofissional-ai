@@ -3,7 +3,8 @@ import { Upload, Check, Clock, AlertCircle, QrCode, Copy, LoaderCircle } from 'l
 import { Resume, PLANS } from '@/types/resume';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
-import { uploadReceipt } from '@/lib/resumeCloud';
+import { uploadReceiptAndLink } from '@/lib/resumeCloud';
+import { useResumeStore } from '@/store/resumeStore';
 import { toast } from 'sonner';
 
 interface PaymentSectionProps {
@@ -16,6 +17,7 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settings = useSettingsStore((state) => state.settings);
+  const syncResumeNow = useResumeStore((state) => state.syncResumeNow);
 
   const plan = { ...PLANS[resume.plan], ...settings.plans[resume.plan] };
   const isPending = resume.paymentStatus === 'pending';
@@ -33,8 +35,11 @@ export function PaymentSection({ resume, onUploadReceipt }: PaymentSectionProps)
     }
     setUploading(true);
     try {
-      const publicUrl = await uploadReceipt(file, resume.id);
-      await onUploadReceipt(publicUrl);
+      const accessToken = resume.accessToken || await syncResumeNow(resume.id);
+      if (!accessToken) throw new Error('Não foi possível preparar o token de acesso do currículo.');
+      const filePath = await uploadReceiptAndLink(file, accessToken);
+      await onUploadReceipt(filePath);
+      toast.success('Comprovante enviado com sucesso.');
     } catch (error) {
       console.error('Falha no envio do comprovante:', error);
       toast.error('Não foi possível enviar o comprovante. Seu currículo continua salvo neste dispositivo.');

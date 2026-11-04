@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Resume, Plan, PaymentStatus, ResumeTemplate } from '@/types/resume';
-import { upsertResumeToCloud } from '@/lib/resumeCloud';
+import { saveResumeClientRpc } from '@/lib/resumeCloud';
 
 interface ResumeState {
   resumes: Resume[];
@@ -16,6 +16,8 @@ interface ResumeState {
   toggleDownloadEnabled: (id: string) => void;
   replaceResumes: (resumes: Resume[]) => void;
   applyRemoteUpdate: (id: string, data: Partial<Resume>) => void;
+  setAccessToken: (id: string, accessToken: string) => void;
+  syncResumeNow: (id: string) => Promise<string | undefined>;
 }
 
 const generateId = () => globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
@@ -23,13 +25,46 @@ const generateId = () => globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xx
   return (char === 'x' ? random : (random & 0x3 | 0x8)).toString(16);
 });
 const syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const queueCloudSync = (resume: Resume) => {
-  const existing = syncTimers.get(resume.id);
+const syncInFlight = new Map<string, Promise<string | undefined>>();
+const syncAgain = new Set<string>();
+
+const queueCloudSync = (resumeId: string) => {
+  const existing = syncTimers.get(resumeId);
   if (existing) clearTimeout(existing);
-  syncTimers.set(resume.id, setTimeout(() => {
-    syncTimers.delete(resume.id);
-    void upsertResumeToCloud(resume).catch((error) => console.warn('Currículo mantido localmente; falha ao sincronizar com a nuvem:', error));
+  syncTimers.set(resumeId, setTimeout(() => {
+    syncTimers.delete(resumeId);
+    void syncResumeToCloud(resumeId);
   }, 600));
+};
+
+const syncResumeToCloud = async (resumeId: string): Promise<string | undefined> => {
+  const running = syncInFlight.get(resumeId);
+  if (running) { syncAgain.add(resumeId); return running; }
+  const operation = (async () => {
+    let accessToken: string | undefined;
+    try {
+      do {
+        syncAgain.delete(resumeId);
+        const resume = useResumeStore.getState().resumes.find((item) => item.id === resumeId);
+        if (!resume) break;
+        const savedVersion = new Date(resume.updatedAt).getTime();
+        accessToken = await saveResumeClientRpc(resume);
+        useResumeStore.getState().setAccessToken(resumeId, accessToken);
+        const latest = useResumeStore.getState().resumes.find((item) => item.id === resumeId);
+        if (latest && new Date(latest.updatedAt).getTime() > savedVersion) syncAgain.add(resumeId);
+      } while (syncAgain.has(resumeId));
+    } catch (error) {
+      console.warn('Currículo mantido localmente; falha ao sincronizar com a nuvem:', error);
+    }
+    return accessToken;
+  })();
+  syncInFlight.set(resumeId, operation);
+  try {
+    return await operation;
+  } finally {
+    syncInFlight.delete(resumeId);
+    if (syncAgain.delete(resumeId)) queueCloudSync(resumeId);
+  }
 };
 
 const createEmptyResume = (plan: Plan): Resume => ({
@@ -66,7 +101,7 @@ export const useResumeStore = create<ResumeState>()(
           resumes: [...state.resumes, newResume],
           currentResume: newResume,
         }));
-        queueCloudSync(newResume);
+        queueCloudSync(newResume.id);
         return newResume;
       },
 
@@ -82,7 +117,7 @@ export const useResumeStore = create<ResumeState>()(
               ? { ...state.currentResume, ...data, updatedAt: new Date() }
               : state.currentResume,
         }));
-        if (updatedResume) queueCloudSync(updatedResume);
+        if (updatedResume) queueCloudSync(updatedResume.id);
       },
 
       setCurrentResume: (resume) => set({ currentResume: resume }),
@@ -90,8 +125,6 @@ export const useResumeStore = create<ResumeState>()(
       getResumeById: (id: string) => get().resumes.find((r) => r.id === id),
 
       updatePaymentStatus: (id: string, status: PaymentStatus, receiptUrl?: string) => {
-        const existingResume = get().resumes.find((resume) => resume.id === id);
-        if (existingResume) queueCloudSync({ ...existingResume, paymentStatus: status, receiptUrl: receiptUrl || existingResume.receiptUrl, updatedAt: new Date() });
         set((state) => ({
           resumes: state.resumes.map((r) =>
             r.id === id
@@ -108,7 +141,6 @@ export const useResumeStore = create<ResumeState>()(
       toggleDownloadEnabled: (id: string) => {
         const resume = get().resumes.find((r) => r.id === id);
         if (resume && resume.paymentStatus === 'confirmed') {
-          queueCloudSync({ ...resume, downloadEnabled: !resume.downloadEnabled, updatedAt: new Date() });
           set((state) => ({
             resumes: state.resumes.map((r) =>
               r.id === id ? { ...r, downloadEnabled: !r.downloadEnabled, updatedAt: new Date() } : r
@@ -127,6 +159,13 @@ export const useResumeStore = create<ResumeState>()(
         resumes: state.resumes.map((resume) => resume.id === id ? { ...resume, ...data } : resume),
         currentResume: state.currentResume?.id === id ? { ...state.currentResume, ...data } : state.currentResume,
       })),
+
+      setAccessToken: (id, accessToken) => set((state) => ({
+        resumes: state.resumes.map((resume) => resume.id === id ? { ...resume, accessToken } : resume),
+        currentResume: state.currentResume?.id === id ? { ...state.currentResume, accessToken } : state.currentResume,
+      })),
+
+      syncResumeNow: (id) => syncResumeToCloud(id),
     }),
     {
       name: 'resume-storage',
