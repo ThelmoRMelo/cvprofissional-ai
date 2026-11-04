@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793714088588,
+      "tag": "0000_admin_settings_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793715040165,
+      "tag": "0001_create_resumes",
+      "breakpoints": true
+    }
+  ]
+}
