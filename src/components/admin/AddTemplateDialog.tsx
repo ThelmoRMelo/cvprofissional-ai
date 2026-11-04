@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Upload, Loader2, Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { Plan, PLANS } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,69 @@ interface AddTemplateDialogProps {
 const ACCEPTED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/bmp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<{ base64: string; mimeType: string; blob: Blob }> => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve({ base64, mimeType: file.type, blob: file });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas context indisponível'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const mimeType = 'image/jpeg';
+      const dataUrl = canvas.toDataURL(mimeType, quality);
+      const base64 = dataUrl.split(',')[1];
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve({ base64, mimeType, blob });
+          } else {
+            resolve({ base64, mimeType, blob: file });
+          }
+        },
+        mimeType,
+        quality,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Falha ao carregar imagem para compressão'));
+    };
+    img.src = url;
+  });
+};
+
 export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: AddTemplateDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -50,6 +113,12 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewImage.startsWith('blob:')) URL.revokeObjectURL(previewImage);
+    };
+  }, [previewImage]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,31 +136,14 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
 
     setReferenceFile(file);
 
-    // Show preview for images
+    // Use an object URL for preview to avoid keeping a large Base64 string in memory.
     if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreviewImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      setPreviewImage(URL.createObjectURL(file));
     } else {
       setPreviewImage('');
     }
 
     toast.success(`Arquivo "${file.name}" selecionado`);
-  };
-
-  const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve({ base64, mimeType: file.type });
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   };
 
   const handleGenerate = async () => {
@@ -114,15 +166,18 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
 
       // Upload reference file to storage if provided
       if (referenceFile) {
-        const fileData = await fileToBase64(referenceFile);
+        const fileData = await compressImage(referenceFile);
         imageBase64 = fileData.base64;
         imageMimeType = fileData.mimeType;
 
         // Upload to storage for future reference
-        const fileName = `${Date.now()}-${referenceFile.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const extension = fileData.mimeType === 'image/jpeg'
+          ? 'jpg'
+          : referenceFile.name.split('.').pop()?.toLowerCase() || 'bin';
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+        const { error: uploadError } = await supabase.storage
           .from('template-references')
-          .upload(fileName, referenceFile);
+          .upload(fileName, fileData.blob, { contentType: fileData.mimeType });
 
         if (uploadError) {
           console.warn('Could not upload reference file:', uploadError);
@@ -195,7 +250,15 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(event) => {
+          if (isGenerating) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (isGenerating) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-accent" />
