@@ -13,6 +13,7 @@ interface ResumesTableProps {
   onFilterChange: (filter: PaymentStatus | 'all') => void;
   onConfirmPayment: (id: string) => void;
   onToggleDownload: (id: string) => void;
+  isOnline?: boolean;
 }
 
 export function ResumesTable({ 
@@ -20,7 +21,8 @@ export function ResumesTable({
   filter, 
   onFilterChange, 
   onConfirmPayment, 
-  onToggleDownload 
+  onToggleDownload,
+  isOnline = true,
 }: ResumesTableProps) {
   const settings = useSettingsStore((state) => state.settings);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -135,14 +137,17 @@ export function ResumesTable({
                       <Switch
                         checked={resume.downloadEnabled}
                         onCheckedChange={() => onToggleDownload(resume.id)}
-                        disabled={resume.paymentStatus !== 'confirmed'}
+                        disabled={resume.paymentStatus !== 'confirmed' || !isOnline}
+                        title={!isOnline ? 'Requer conexão com a internet' : undefined}
                       />
                     </td>
                     <td className="px-6 py-4">
                       {resume.paymentStatus === 'receipt_sent' && (
                         <button
                           onClick={() => onConfirmPayment(resume.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                          disabled={!isOnline}
+                          title={!isOnline ? 'Requer conexão com a internet' : undefined}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Check className="w-4 h-4" />
                           Confirmar
