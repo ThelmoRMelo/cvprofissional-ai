@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Download, Lock, FileText } from 'lucide-react';
 import { useResumeStore } from '@/store/resumeStore';
@@ -15,6 +15,8 @@ export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentResume, setCurrentResume, updateResume, syncResumeNow, applyRemoteUpdate } = useResumeStore();
+  const canDownloadRef = useRef(false);
+  const printActionRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     // Block printing
@@ -23,7 +25,8 @@ export default function Editor() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
-        alert('Impressão desabilitada. Por favor, realize o pagamento para baixar seu currículo.');
+        if (canDownloadRef.current) printActionRef.current();
+        else alert('Impressão desabilitada. Por favor, realize o pagamento para baixar seu currículo.');
       }
     };
     
@@ -85,12 +88,49 @@ export default function Editor() {
 
   const handleDownload = () => {
     if (!canDownload) return;
-    // In production, this would generate and download a PDF
-    alert('Download do PDF iniciado!');
+    const preview = document.querySelector('.resume-preview');
+    if (!preview) return;
+
+    const oldTitle = document.title;
+    const wasPrintBlocked = document.body.classList.contains('print-blocked');
+    const wasPrintOnly = document.body.classList.contains('print-resume-only');
+    const safeName = (currentResume.personalData.fullName || 'Curriculo')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\\/:*?"<>|]/g, '')
+      .trim() || 'Curriculo';
+    let fallbackTimer: number | undefined;
+    let restored = false;
+    const restorePrintState = () => {
+      if (restored) return;
+      restored = true;
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+      window.removeEventListener('afterprint', restorePrintState);
+      document.body.classList.remove('print-resume-only');
+      if (wasPrintBlocked) document.body.classList.add('print-blocked');
+      if (wasPrintOnly) document.body.classList.add('print-resume-only');
+      document.title = oldTitle;
+    };
+
+    document.body.classList.remove('print-blocked');
+    document.body.classList.add('print-resume-only');
+    document.title = `Curriculo - ${safeName}.pdf`;
+    window.addEventListener('afterprint', restorePrintState);
+    try {
+      void document.body.offsetHeight;
+      window.print();
+      if (!restored) fallbackTimer = window.setTimeout(restorePrintState, 1500);
+    } catch (error) {
+      restorePrintState();
+      console.error('Falha ao abrir a impressão do currículo:', error);
+    }
   };
 
+  canDownloadRef.current = canDownload;
+  printActionRef.current = handleDownload;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="editor-page min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -136,10 +176,10 @@ export default function Editor() {
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
+      <div className="editor-content container mx-auto px-4 py-8">
+        <div className="editor-grid grid lg:grid-cols-2 gap-8">
           {/* Left Column - Form */}
-          <div className="space-y-6">
+          <div className="editor-form-column space-y-6">
             <div className="bg-card rounded-2xl border border-border p-6">
               <ResumeForm resume={currentResume} onUpdate={handleUpdate} />
             </div>
@@ -158,15 +198,17 @@ export default function Editor() {
           </div>
 
           {/* Right Column - Preview */}
-          <div className="lg:sticky lg:top-24 lg:h-fit">
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 className="font-medium text-foreground mb-4">Pré-visualização</h3>
-              <div className="bg-secondary/50 rounded-xl p-4 flex items-center justify-center overflow-hidden">
-                <ResumePreview resume={currentResume} template={currentResume.template} />
+          <div className="editor-preview-column lg:sticky lg:top-24 lg:h-fit">
+            <div className="editor-preview-card bg-card rounded-2xl border border-border p-6">
+              <h3 className="preview-heading font-medium text-foreground mb-4">Pré-visualização</h3>
+              <div className="resume-preview-screen-frame bg-secondary/50 rounded-xl p-4 flex items-center justify-center overflow-hidden">
+                <div className="resume-preview-holder">
+                  <ResumePreview resume={currentResume} template={currentResume.template} />
+                </div>
               </div>
               
               {!canDownload && (
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-3">
+                <div className="download-warning mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-start gap-3">
                   <Lock className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-yellow-800">

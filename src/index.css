@@ -145,9 +145,136 @@
   }
 }
 
-/* Block printing when not authorized */
+/* Print is enabled only during the paid resume export flow. */
 @media print {
-  body.print-blocked {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body.print-blocked:not(.print-resume-only) {
     display: none !important;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.print-resume-only * {
+    visibility: hidden !important;
+  }
+
+  body.print-resume-only .editor-page,
+  body.print-resume-only .editor-content,
+  body.print-resume-only .editor-grid,
+  body.print-resume-only .editor-preview-column,
+  body.print-resume-only .editor-preview-card,
+  body.print-resume-only .resume-preview-screen-frame,
+  body.print-resume-only .resume-preview-holder,
+  body.print-resume-only .resume-preview-holder * {
+    visibility: visible !important;
+  }
+
+  body.print-resume-only .editor-page {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  body.print-resume-only .editor-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.print-resume-only .editor-grid {
+    display: block !important;
+  }
+
+  body.print-resume-only .editor-page > header {
+    display: none !important;
+  }
+
+  body.print-resume-only .editor-form-column,
+  body.print-resume-only .preview-heading,
+  body.print-resume-only .download-warning {
+    display: none !important;
+  }
+
+  body.print-resume-only .editor-preview-column {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  body.print-resume-only .editor-preview-card {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  body.print-resume-only .resume-preview-screen-frame,
+  body.print-resume-only .resume-preview-holder {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  body.print-resume-only .resume-preview {
+    box-sizing: border-box !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    height: auto !important;
+    margin: 0 auto !important;
+    padding: 12mm !important;
+    aspect-ratio: auto !important;
+    transform: none !important;
+    transform-origin: top left !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    overflow: visible !important;
+    color: #1f2937 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.print-resume-only .resume-preview * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.print-resume-only .resume-entry {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body.print-resume-only .resume-preview h2 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
   }
 }

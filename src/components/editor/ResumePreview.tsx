@@ -43,7 +43,7 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
           </h2>
           <div className="space-y-3">
             {experiences.map((exp) => (
-              <div key={exp.id}>
+              <div key={exp.id} className="resume-entry">
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-semibold text-gray-900">{exp.position}</h3>
@@ -70,7 +70,7 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
           </h2>
           <div className="space-y-2">
             {education.map((edu) => (
-              <div key={edu.id} className="flex justify-between items-start">
+              <div key={edu.id} className="resume-entry flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold text-gray-900">{edu.degree} em {edu.field}</h3>
                   <p className="text-gray-600">{edu.institution}</p>
