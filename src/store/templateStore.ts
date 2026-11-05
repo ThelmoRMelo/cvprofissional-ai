@@ -38,15 +38,18 @@ type IntermediateLayout = {
 
 const INTERMEDIATE_LAYOUTS: IntermediateLayout[] = [
   { id: 'c1f0a002-0000-4000-8000-000000000001', name: 'Intermediário Azul Lateral Elegante', accent: '#2874d0', dark: '#1d4c9a', background: '#ffffff', layout: 'navy-sidebar', prompt: 'Foto circular grande e coluna azul-marinho à esquerda com nome, contato e habilidades em barras; objetivo, formação e experiência à direita com cabeçalhos azuis arredondados. Inspirado no terceiro modelo selecionado pelo cliente.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000002', name: 'Intermediário Âmbar em Destaque', accent: '#f4b72f', dark: '#14264b', background: '#fffaf0', layout: 'amber-feature', prompt: 'Foto no topo direito, objetivo em bloco amarelo e títulos em faixas azul-marinho, inspirado na segunda referência.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000003', name: 'Intermediário Céu Profissional', accent: '#1594ed', dark: '#073a78', background: '#eff7ff', layout: 'sky-sidebar', prompt: 'Coluna lateral azul-clara para contato, competências e idiomas; área principal branca, inspirada na terceira referência.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000004', name: 'Intermediário Verde Equilíbrio', accent: '#1a9b78', dark: '#123c3b', background: '#f1faf7', layout: 'green-columns', prompt: 'Cabeçalho verde esmeralda, resumo objetivo e rodapé dividido em formação e competências.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000005', name: 'Intermediário Grafite Moderno', accent: '#75849a', dark: '#202b3b', background: '#f5f6f8', layout: 'graphite-header', prompt: 'Cabeçalho grafite de largura total, tipografia sóbria e seções limpas de leitura rápida.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000006', name: 'Intermediário Vinho Elegante', accent: '#bb536d', dark: '#4b2438', background: '#fff6f7', layout: 'wine-timeline', prompt: 'Linha vertical vinho conduz o histórico profissional e diferencia formação e perfil.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000007', name: 'Intermediário Roxo Criativo', accent: '#8a63d2', dark: '#352454', background: '#f8f5ff', layout: 'violet-panel', prompt: 'Painel roxo com foto, contato e competências, combinado com conteúdo editorial em branco.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000008', name: 'Intermediário Turquesa Essencial', accent: '#13a6ad', dark: '#123f51', background: '#f0fbfc', layout: 'teal-minimal', prompt: 'Cabeçalho centralizado com detalhe turquesa e bastante espaço entre seções.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000009', name: 'Intermediário Coral Dinâmico', accent: '#ef765c', dark: '#3b3543', background: '#fff7f3', layout: 'coral-highlights', prompt: 'Identidade coral com cartões para resumo e competências e marcadores nas seções.' },
-  { id: 'c1f0a002-0000-4000-8000-000000000010', name: 'Intermediário Marinho Clássico', accent: '#2874b8', dark: '#10294b', background: '#f3f7fc', layout: 'marine-classic', prompt: 'Cabeçalho clássico marinho, separadores finos e hierarquia formal para perfis corporativos.' },
+];
+
+const REMOVED_INTERMEDIATE_TEMPLATE_IDS = [
+  'c1f0a002-0000-4000-8000-000000000002',
+  'c1f0a002-0000-4000-8000-000000000003',
+  'c1f0a002-0000-4000-8000-000000000004',
+  'c1f0a002-0000-4000-8000-000000000005',
+  'c1f0a002-0000-4000-8000-000000000006',
+  'c1f0a002-0000-4000-8000-000000000007',
+  'c1f0a002-0000-4000-8000-000000000008',
+  'c1f0a002-0000-4000-8000-000000000009',
+  'c1f0a002-0000-4000-8000-000000000010',
 ];
 
 const makePreviewUrl = ({ accent, dark, background, layout }: IntermediateLayout) => {
@@ -130,7 +133,8 @@ const INTERMEDIATE_STARTER_TEMPLATES: TemplateModel[] = INTERMEDIATE_LAYOUTS.map
 const STARTER_TEMPLATES = [...BASIC_STARTER_TEMPLATES, ...INTERMEDIATE_STARTER_TEMPLATES];
 
 const mergeStarterTemplates = (templates: TemplateModel[]) => {
-  const byId = new Map(templates.map((template) => [template.id, template]));
+  const removedIds = new Set(REMOVED_INTERMEDIATE_TEMPLATE_IDS);
+  const byId = new Map(templates.filter((template) => !removedIds.has(template.id)).map((template) => [template.id, template]));
   for (const starter of STARTER_TEMPLATES) if (!byId.has(starter.id)) byId.set(starter.id, starter);
   return [...byId.values()];
 };
@@ -141,6 +145,10 @@ export const useTemplateStore = create<TemplateState>()(
       templates: STARTER_TEMPLATES,
 
       loadFromCloud: async (persistStarterTemplates = false) => {
+        if (persistStarterTemplates) {
+          const { error } = await supabase.from('templates').delete().in('id', REMOVED_INTERMEDIATE_TEMPLATE_IDS);
+          if (error) console.error('Não foi possível remover os modelos intermediários substituídos:', error);
+        }
         const list = await fetchTemplates();
         const templates = mergeStarterTemplates(list ?? get().templates);
         set({ templates });
