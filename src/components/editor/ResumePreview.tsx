@@ -47,7 +47,7 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
 
     let html = sanitizeTemplateHtml(matchedTemplate.generatedHtml);
     // Older starter models contain static sample copy instead of client placeholders.
-    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|experiencias|educacao|habilidades|foto)\}\}/i.test(html)) {
+    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|profissao|experiencias|educacao|habilidades(?:_barras)?|foto)\}\}/i.test(html)) {
       return null;
     }
     const safe = (value?: string, fallback = '') => escapeHtml(value || fallback);
@@ -57,7 +57,13 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
       html = html.replace(/\{\{foto\}\}/gi, `<img src="${safePhotoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" alt="Foto" />`);
     } else {
       html = html.replace(/<img\b[^>]*src=(['"])\{\{foto\}\}\1[^>]*>/gi, '');
-      html = html.replace(/\{\{foto\}\}/gi, '');
+      const initials = personalData.fullName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toLocaleUpperCase())
+        .join('') || 'CV';
+      html = html.replace(/\{\{foto\}\}/gi, `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:34px;font-weight:700;color:#718096;">${safe(initials)}</span>`);
     }
     html = html.replace(/\{\{nome\}\}/gi, () => safe(personalData.fullName, 'Seu Nome'));
     html = html.replace(/\{\{email\}\}/gi, () => safe(personalData.email, 'seu.email@exemplo.com'));
@@ -65,6 +71,7 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
     html = html.replace(/\{\{endereco\}\}/gi, () => safe(personalData.address, 'Cidade - UF'));
     html = html.replace(/\{\{linkedin\}\}/gi, () => safe(personalData.linkedin));
     html = html.replace(/\{\{objetivo\}\}/gi, () => safe(personalData.objective, 'Objetivo profissional...'));
+    html = html.replace(/\{\{profissao\}\}/gi, () => safe(experiences.find((experience) => experience.position)?.position, 'Profissional'));
 
     const experienceHtml = experiences.length > 0
       ? experiences.map((experience) => `
@@ -90,7 +97,14 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
     const skillsHtml = skills.length > 0
       ? `<div style="display: flex; flex-wrap: wrap; gap: 6px;">${skills.map((skill) => `<span style="background: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${safe(skill.name)}</span>`).join('')}</div>`
       : '<p style="color: #9ca3af; font-size: 12px;">Preencha suas habilidades.</p>';
+    const skillsWithBarsHtml = skills.length > 0
+      ? skills.map((skill) => {
+        const levelWidth = { beginner: 45, intermediate: 65, advanced: 82, expert: 96 }[skill.level];
+        return `<div style="margin:0 0 10px;"><div style="font-size:10px;font-weight:700;margin-bottom:4px;">${safe(skill.name)}</div><div style="height:10px;background:#fff;border-radius:8px;overflow:hidden;"><div style="height:100%;width:${levelWidth}%;background:#c5bdc2;border-radius:8px;"></div></div></div>`;
+      }).join('')
+      : '<p style="color:rgba(255,255,255,.75);font-size:10px;">Adicione suas habilidades.</p>';
     html = html.replace(/\{\{habilidades\}\}/gi, () => skillsHtml);
+    html = html.replace(/\{\{habilidades_barras\}\}/gi, () => skillsWithBarsHtml);
 
     return html;
   }, [matchedTemplate, personalData, experiences, education, skills]);
