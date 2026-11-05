@@ -47,10 +47,18 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
 
     let html = sanitizeTemplateHtml(matchedTemplate.generatedHtml);
     // Older starter models contain static sample copy instead of client placeholders.
-    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|experiencias|educacao|habilidades)\}\}/i.test(html)) {
+    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|experiencias|educacao|habilidades|foto)\}\}/i.test(html)) {
       return null;
     }
     const safe = (value?: string, fallback = '') => escapeHtml(value || fallback);
+    if (personalData.photoUrl) {
+      const safePhotoUrl = safe(personalData.photoUrl);
+      html = html.replace(/src=(['"])\{\{foto\}\}\1/gi, `src="${safePhotoUrl}"`);
+      html = html.replace(/\{\{foto\}\}/gi, `<img src="${safePhotoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" alt="Foto" />`);
+    } else {
+      html = html.replace(/<img\b[^>]*src=(['"])\{\{foto\}\}\1[^>]*>/gi, '');
+      html = html.replace(/\{\{foto\}\}/gi, '');
+    }
     html = html.replace(/\{\{nome\}\}/gi, () => safe(personalData.fullName, 'Seu Nome'));
     html = html.replace(/\{\{email\}\}/gi, () => safe(personalData.email, 'seu.email@exemplo.com'));
     html = html.replace(/\{\{telefone\}\}/gi, () => safe(personalData.phone, '(00) 00000-0000'));
@@ -99,6 +107,9 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
     <div className="resume-preview p-8 text-sm text-gray-800 scale-90 origin-top">
       {/* Header */}
       <div className={`mb-6 pb-4 border-b-2 ${template === 'modern' ? 'border-accent' : template === 'classic' ? 'border-gray-800' : 'border-gray-300'}`}>
+        {personalData.photoUrl && (
+          <img src={personalData.photoUrl} alt="Foto do cliente" className="mb-3 h-24 w-24 rounded-full object-cover" />
+        )}
         <h1 className={`text-2xl font-bold ${template === 'modern' ? 'text-primary' : 'text-gray-900'}`}>
           {personalData.fullName || 'Seu Nome'}
         </h1>

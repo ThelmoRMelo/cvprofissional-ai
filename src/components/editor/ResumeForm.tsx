@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, User, Briefcase, GraduationCap, Lightbulb } from 'lucide-react';
+import { useRef, useState, type ChangeEvent } from 'react';
+import { Plus, Trash2, User, Briefcase, GraduationCap, Lightbulb, Camera, X } from 'lucide-react';
 import { Resume, Experience, Education, Skill } from '@/types/resume';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,7 @@ type TabType = 'personal' | 'experience' | 'education' | 'skills';
 
 export function ResumeForm({ resume, onUpdate }: ResumeFormProps) {
   const [activeTab, setActiveTab] = useState<TabType>('personal');
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const tabs = [
     { id: 'personal' as const, label: 'Dados Pessoais', icon: User },
@@ -27,6 +28,50 @@ export function ResumeForm({ resume, onUpdate }: ResumeFormProps) {
       personalData: { ...resume.personalData, [field]: value },
       clientName: field === 'fullName' ? value : resume.clientName,
     });
+  };
+
+  const handlePhotoSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      window.alert('Selecione uma imagem JPG, PNG ou WEBP.');
+      event.target.value = '';
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const maxDim = 512;
+      let { width, height } = image;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        window.alert('Não foi possível processar a imagem.');
+        return;
+      }
+      context.drawImage(image, 0, 0, width, height);
+      updatePersonalData('photoUrl', canvas.toDataURL('image/jpeg', 0.85));
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      window.alert('Não foi possível abrir a imagem selecionada.');
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    };
+    image.src = objectUrl;
   };
 
   const addExperience = () => {
@@ -124,6 +169,33 @@ export function ResumeForm({ resume, onUpdate }: ResumeFormProps) {
       {/* Personal Data Tab */}
       {activeTab === 'personal' && (
         <div className="space-y-4 animate-fade-in">
+          <div className="flex items-center gap-4">
+            <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
+              {resume.personalData.photoUrl ? (
+                <img src={resume.personalData.photoUrl} alt="Foto do currículo" className="h-full w-full object-cover" />
+              ) : (
+                <User className="h-8 w-8 text-muted-foreground" />
+              )}
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                aria-label="Adicionar ou alterar foto"
+                className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
+              <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoSelect} className="hidden" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Foto do currículo</p>
+              <p className="text-xs text-muted-foreground">JPG, PNG ou WEBP. A imagem é otimizada no dispositivo.</p>
+              {resume.personalData.photoUrl && (
+                <button type="button" onClick={() => updatePersonalData('photoUrl', '')} className="inline-flex items-center gap-1 text-xs text-destructive hover:underline">
+                  <X className="h-3 w-3" /> Remover foto
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Nome Completo *</label>

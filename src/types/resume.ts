@@ -11,6 +11,7 @@ export interface PersonalData {
   address: string;
   linkedin?: string;
   objective?: string;
+  photoUrl?: string;
 }
 
 export interface Experience {

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Download, Lock, FileText } from 'lucide-react';
+import { ArrowLeft, Download, Lock, FileText, Loader2 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useResumeStore } from '@/store/resumeStore';
 import { useTemplateStore } from '@/store/templateStore';
 import { ResumeForm } from '@/components/editor/ResumeForm';
@@ -23,6 +25,7 @@ export default function Editor() {
   );
   const canDownloadRef = useRef(false);
   const printActionRef = useRef<() => void>(() => undefined);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
     // Block printing
@@ -102,43 +105,54 @@ export default function Editor() {
     applyRemoteUpdate(currentResume.id, { paymentStatus: 'receipt_sent', receiptPath: path });
   };
 
-  const handleDownload = () => {
-    if (!canDownload) return;
-    const preview = document.querySelector('.resume-preview');
-    if (!preview) return;
+  const handleDownload = async () => {
+    if (!canDownload || isGeneratingPdf) return;
+    const previewElement = document.querySelector('.resume-preview') as HTMLElement | null;
+    if (!previewElement) return;
 
-    const oldTitle = document.title;
-    const wasPrintBlocked = document.body.classList.contains('print-blocked');
-    const wasPrintOnly = document.body.classList.contains('print-resume-only');
-    const safeName = (currentResume.personalData.fullName || 'Curriculo')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[\\/:*?"<>|]/g, '')
-      .trim() || 'Curriculo';
-    let fallbackTimer: number | undefined;
-    let restored = false;
-    const restorePrintState = () => {
-      if (restored) return;
-      restored = true;
-      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
-      window.removeEventListener('afterprint', restorePrintState);
-      document.body.classList.remove('print-resume-only');
-      if (wasPrintBlocked) document.body.classList.add('print-blocked');
-      if (wasPrintOnly) document.body.classList.add('print-resume-only');
-      document.title = oldTitle;
-    };
-
-    document.body.classList.remove('print-blocked');
-    document.body.classList.add('print-resume-only');
-    document.title = `Curriculo - ${safeName}.pdf`;
-    window.addEventListener('afterprint', restorePrintState);
+    setIsGeneratingPdf(true);
     try {
-      void document.body.offsetHeight;
-      window.print();
-      if (!restored) fallbackTimer = window.setTimeout(restorePrintState, 1500);
+      const canvas = await html2canvas(previewElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1200,
+        onclone: (clonedDocument) => {
+          const clonedPreview = clonedDocument.querySelector('.resume-preview') as HTMLElement | null;
+          if (clonedPreview) {
+            clonedPreview.style.transform = 'none';
+            clonedPreview.style.width = '794px';
+            clonedPreview.style.maxWidth = '794px';
+            clonedPreview.style.margin = '0';
+            clonedPreview.style.borderRadius = '0';
+            clonedPreview.style.boxShadow = 'none';
+          }
+        },
+      });
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const imageHeight = (canvas.height * pageWidth) / canvas.width;
+      const pageCount = Math.max(1, Math.ceil(imageHeight / pageHeight));
+      for (let page = 0; page < pageCount; page += 1) {
+        if (page > 0) pdf.addPage();
+        pdf.addImage(imageData, 'JPEG', 0, -page * pageHeight, pageWidth, imageHeight);
+      }
+
+      const safeName = (currentResume.personalData.fullName || 'Curriculo')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\\/:*?"<>|]/g, '')
+        .trim() || 'Curriculo';
+      pdf.save(`Curriculo - ${safeName}.pdf`);
     } catch (error) {
-      restorePrintState();
-      console.error('Falha ao abrir a impressão do currículo:', error);
+      console.error('Erro ao gerar PDF:', error);
+      alert('Ocorreu um erro ao gerar seu PDF. Por favor, tente novamente.');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -173,7 +187,7 @@ export default function Editor() {
 
           <button
             onClick={handleDownload}
-            disabled={!canDownload}
+            disabled={!canDownload || isGeneratingPdf}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all',
               canDownload
@@ -181,12 +195,14 @@ export default function Editor() {
                 : 'bg-secondary text-muted-foreground cursor-not-allowed'
             )}
           >
-            {canDownload ? (
+            {isGeneratingPdf ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : canDownload ? (
               <Download className="w-4 h-4" />
             ) : (
               <Lock className="w-4 h-4" />
             )}
-            {canDownload ? 'Baixar PDF' : 'Download bloqueado'}
+            {isGeneratingPdf ? 'Gerando PDF...' : canDownload ? 'Baixar PDF' : 'Download bloqueado'}
           </button>
         </div>
       </header>
