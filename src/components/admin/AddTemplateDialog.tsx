@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useRef } from 'react';
 import { Upload, Loader2, Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { Plan, PLANS } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ interface AddTemplateDialogProps {
   }) => void;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
 const isValidFileType = (file: File): boolean => {
   if (file.type) {
@@ -46,14 +46,16 @@ const isValidFileType = (file: File): boolean => {
   return ['jpg', 'jpeg', 'png', 'bmp', 'webp', 'heic', 'pdf'].includes(ext);
 };
 
-const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<{ base64: string; mimeType: string; blob: Blob }> => {
+function compressImageForMobile(file: File, maxDim = 1024, quality = 0.75): Promise<{ base64: string; mimeType: string; blob: Blob }> {
   return new Promise((resolve, reject) => {
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
     const extensionMimeTypes: Record<string, string> = {
       jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', bmp: 'image/bmp',
       webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf',
     };
-    const mimeType = file.type || extensionMimeTypes[extension] || 'application/octet-stream';
+    const mimeType = file.type.startsWith('image/') || file.type === 'application/pdf'
+      ? file.type
+      : extensionMimeTypes[extension] || file.type || 'application/octet-stream';
     const isImage = mimeType.startsWith('image/');
     const resolveOriginal = () => {
       const reader = new FileReader();
@@ -75,13 +77,13 @@ const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
-      if (width > maxDimension || height > maxDimension) {
+      if (width > maxDim || height > maxDim) {
         if (width > height) {
-          height = Math.round((height * maxDimension) / width);
-          width = maxDimension;
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
         } else {
-          width = Math.round((width * maxDimension) / height);
-          height = maxDimension;
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
         }
       }
 
@@ -90,7 +92,7 @@ const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        reject(new Error('Canvas context indisponível'));
+        reject(new Error('Falha no canvas'));
         return;
       }
       ctx.drawImage(img, 0, 0, width, height);
@@ -100,13 +102,7 @@ const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<
       const base64 = dataUrl.split(',')[1];
 
       canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve({ base64, mimeType, blob });
-          } else {
-            resolve({ base64, mimeType, blob: file });
-          }
-        },
+        (blob) => resolve({ base64, mimeType, blob: blob || file }),
         mimeType,
         quality,
       );
@@ -118,7 +114,7 @@ const compressImage = (file: File, maxDimension = 1280, quality = 0.8): Promise<
     };
     img.src = url;
   });
-};
+}
 
 export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: AddTemplateDialogProps) {
   const [formData, setFormData] = useState({
@@ -128,52 +124,76 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
     prompt: '',
   });
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [compressedData, setCompressedData] = useState<{ base64: string; mimeType: string; blob: Blob } | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>('');
-  useEffect(() => {
-    return () => {
-      if (previewImage.startsWith('blob:')) URL.revokeObjectURL(previewImage);
-    };
-  }, [previewImage]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
+  const resetForm = () => {
+    setFormData({ name: '', category: 'basic', previewUrl: '', prompt: '' });
+    setReferenceFile(null);
+    setCompressedData(null);
+    setPreviewImage('');
+  };
+
+  const handleManualClose = () => {
+    if (isGenerating || isCompressing) return;
+    resetForm();
+    onOpenChange(false);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!isValidFileType(file)) {
       toast.error('Formato inválido. Aceitos: JPG, PNG, WEBP, BMP ou PDF');
-      input.value = '';
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      toast.error('Arquivo muito grande. Máximo: 10MB');
-      input.value = '';
+      toast.error('Arquivo muito grande. Máximo permitido: 15MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    setReferenceFile(file);
-
-    // Use an object URL for preview to avoid keeping a large Base64 string in memory.
-    if (file.type.startsWith('image/') || !file.name.toLowerCase().endsWith('.pdf')) {
-      setPreviewImage(URL.createObjectURL(file));
-    } else {
+    setIsCompressing(true);
+    try {
+      setReferenceFile(file);
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'bmp', 'webp', 'heic'].includes(extension);
+      if (isImage) {
+        const compressed = await compressImageForMobile(file);
+        setCompressedData(compressed);
+        setPreviewImage(`data:${compressed.mimeType};base64,${compressed.base64}`);
+      } else {
+        const original = await compressImageForMobile(file);
+        setCompressedData(original);
+        setPreviewImage('');
+      }
+      toast.success(`Arquivo "${file.name}" carregado com sucesso.`);
+    } catch (error) {
+      console.error('Falha ao processar arquivo de referência:', error);
+      setReferenceFile(null);
+      setCompressedData(null);
       setPreviewImage('');
+      toast.error('Não foi possível processar a imagem selecionada.');
+    } finally {
+      setIsCompressing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-
-    toast.success(`Arquivo "${file.name}" selecionado`);
-    input.value = '';
   };
 
   const handleGenerate = async () => {
-    if (!formData.name) {
-      toast.error('Digite o nome do modelo');
+    if (!formData.name.trim()) {
+      toast.error('Informe o nome do modelo.');
       return;
     }
 
-    if (!formData.prompt && !referenceFile) {
-      toast.error('Adicione um prompt ou faça upload de uma imagem de referência');
+    if (!formData.prompt.trim() && !referenceFile) {
+      toast.error('Adicione um prompt ou anexe uma imagem de referência.');
       return;
     }
 
@@ -184,20 +204,19 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
       let imageMimeType: string | undefined;
       let referenceFileUrl: string | undefined;
 
-      // Upload reference file to storage if provided
-      if (referenceFile) {
-        const fileData = await compressImage(referenceFile);
-        imageBase64 = fileData.base64;
-        imageMimeType = fileData.mimeType;
+      // Use the data compressed during selection and upload that same optimized blob.
+      if (referenceFile && compressedData) {
+        imageBase64 = compressedData.base64;
+        imageMimeType = compressedData.mimeType;
 
         // Upload to storage for future reference
-        const extension = fileData.mimeType === 'image/jpeg'
+        const extension = compressedData.mimeType === 'image/jpeg'
           ? 'jpg'
           : referenceFile.name.split('.').pop()?.toLowerCase() || 'bin';
         const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
         const { error: uploadError } = await supabase.storage
           .from('template-references')
-          .upload(fileName, fileData.blob, { contentType: fileData.mimeType });
+          .upload(fileName, compressedData.blob, { contentType: compressedData.mimeType });
 
         if (uploadError) {
           console.warn('Could not upload reference file:', uploadError);
@@ -245,10 +264,8 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
 
       toast.success('Modelo criado com sucesso!');
       
-      // Reset form
-      setFormData({ name: '', category: 'basic', previewUrl: '', prompt: '' });
-      setReferenceFile(null);
-      setPreviewImage('');
+      // Reset state and close after successful generation, even before React commits isGenerating=false.
+      resetForm();
       onOpenChange(false);
 
     } catch (error) {
@@ -259,21 +276,13 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
     }
   };
 
-  const handleClose = () => {
-    if (!isGenerating) {
-      setFormData({ name: '', category: 'basic', previewUrl: '', prompt: '' });
-      setReferenceFile(null);
-      setPreviewImage('');
-      onOpenChange(false);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen && !isGenerating && !isCompressing) handleManualClose(); }}>
       <DialogContent
         className="sm:max-w-2xl max-h-[90vh] overflow-y-auto"
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
+        onFocusOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => {
           if (isGenerating) event.preventDefault();
         }}
@@ -295,7 +304,7 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ex: Moderno Executivo"
-                disabled={isGenerating}
+                disabled={isGenerating || isCompressing}
               />
             </div>
             <div className="space-y-2">
@@ -303,7 +312,7 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
               <Select
                 value={formData.category}
                 onValueChange={(value: Plan) => setFormData({ ...formData, category: value })}
-                disabled={isGenerating}
+                disabled={isGenerating || isCompressing}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -326,26 +335,29 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
                 onChange={(e) => setFormData({ ...formData, previewUrl: e.target.value })}
                 placeholder="URL da imagem de preview"
                 className="flex-1"
-                disabled={isGenerating}
+                disabled={isGenerating || isCompressing}
               />
-              <label
-                htmlFor="template-file-upload"
-                className={`inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground ${isGenerating ? 'pointer-events-none opacity-50' : ''}`}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isGenerating || isCompressing}
+                className="gap-2 shrink-0"
               >
-                <Upload className="w-4 h-4" />
-                Upload
-                <input
-                  id="template-file-upload"
-                  type="file"
-                  accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.bmp,.webp,.heic"
-                  onChange={handleFileSelect}
-                  disabled={isGenerating}
-                  className="sr-only"
-                />
-              </label>
+                {isCompressing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {isCompressing ? 'Otimizando...' : 'Upload'}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.bmp,.webp,.heic"
+                onChange={handleFileSelect}
+                disabled={isGenerating || isCompressing}
+                className="hidden"
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              Aceita: PDF, JPG, PNG, BMP (máx. 10MB). O arquivo será usado como referência visual para a IA.
+              Aceita fotos, imagens ou PDF (máx. 15 MB). O arquivo é otimizado antes do envio.
             </p>
           </div>
 
@@ -355,7 +367,7 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
               {referenceFile && (
                 <div className="border rounded-lg p-4 bg-secondary/50">
                   <div className="flex items-center gap-3">
-                    {referenceFile.type === 'application/pdf' ? (
+                    {referenceFile.type === 'application/pdf' || referenceFile.name.toLowerCase().endsWith('.pdf') ? (
                       <FileText className="w-10 h-10 text-red-500" />
                     ) : (
                       <ImageIcon className="w-10 h-10 text-blue-500" />
@@ -371,9 +383,10 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
                       size="sm"
                       onClick={() => {
                         setReferenceFile(null);
+                        setCompressedData(null);
                         setPreviewImage('');
                       }}
-                      disabled={isGenerating}
+                      disabled={isGenerating || isCompressing}
                     >
                       Remover
                     </Button>
@@ -402,7 +415,7 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
               onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
               placeholder="Descreva como o currículo deve ser estruturado e estilizado. Ex: 'Crie um currículo moderno com cores escuras, seções bem definidas e layout de duas colunas. Destaque as habilidades com ícones.'"
               rows={5}
-              disabled={isGenerating}
+              disabled={isGenerating || isCompressing}
               className="resize-none"
             />
             <p className="text-xs text-muted-foreground">
@@ -426,10 +439,10 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isGenerating}>
+          <Button type="button" variant="outline" onClick={handleManualClose} disabled={isGenerating || isCompressing}>
             Cancelar
           </Button>
-          <Button onClick={handleGenerate} disabled={isGenerating || !formData.name} className="gap-2">
+          <Button type="button" onClick={handleGenerate} disabled={isGenerating || isCompressing || !formData.name.trim()} className="gap-2">
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
