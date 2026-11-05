@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, Sparkles, FileText, Image as ImageIcon } from 'lucide-react';
 import { Plan, PLANS } from '@/types/resume';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,32 @@ interface AddTemplateDialogProps {
 }
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const DRAFT_KEY = 'cv-template-draft';
+
+type CompressedData = { base64: string; mimeType: string; blob: Blob };
+type DraftData = {
+  formData: { name: string; category: Plan; previewUrl: string; prompt: string };
+  file?: { name: string; size: number; base64: string; mimeType: string };
+};
+
+const base64ToBlob = (base64: string, mimeType: string) => {
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mimeType });
+};
+
+const readDraft = (): DraftData | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as DraftData) : null;
+  } catch {
+    return null;
+  }
+};
+
+/** True when an unfinished "Adicionar modelo" form was saved (e.g. the phone reloaded the app). */
+export const hasTemplateDraft = () => readDraft() !== null;
 
 const isValidFileType = (file: File): boolean => {
   if (file.type) {
@@ -117,20 +143,47 @@ function compressImageForMobile(file: File, maxDim = 1024, quality = 0.75): Prom
 }
 
 export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: AddTemplateDialogProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    category: 'basic' as Plan,
-    previewUrl: '',
-    prompt: '',
+  const [initialDraft] = useState(readDraft);
+  const [formData, setFormData] = useState(
+    initialDraft?.formData ?? { name: '', category: 'basic' as Plan, previewUrl: '', prompt: '' },
+  );
+  const [compressedData, setCompressedData] = useState<CompressedData | null>(() => {
+    const f = initialDraft?.file;
+    if (!f) return null;
+    try { return { base64: f.base64, mimeType: f.mimeType, blob: base64ToBlob(f.base64, f.mimeType) }; } catch { return null; }
   });
-  const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [compressedData, setCompressedData] = useState<{ base64: string; mimeType: string; blob: Blob } | null>(null);
+  const [referenceFile, setReferenceFile] = useState<File | null>(() => {
+    const f = initialDraft?.file;
+    if (!f || !compressedData) return null;
+    return new File([compressedData.blob], f.name, { type: f.mimeType });
+  });
   const [isCompressing, setIsCompressing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string>('');
+  const [previewImage, setPreviewImage] = useState<string>(() => {
+    const f = initialDraft?.file;
+    return f && f.mimeType.startsWith('image/') ? `data:${f.mimeType};base64,${f.base64}` : '';
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Keep an unfinished form saved on the device so that, if the phone reloads the app
+  // while choosing a photo, the admin comes back to the same form with the image attached.
+  useEffect(() => {
+    if (!open) return;
+    const hasContent = formData.name || formData.prompt || formData.previewUrl || compressedData;
+    if (!hasContent) { localStorage.removeItem(DRAFT_KEY); return; }
+    const draft: DraftData = { formData };
+    if (compressedData && referenceFile && compressedData.base64.length < 3_000_000) {
+      draft.file = { name: referenceFile.name, size: referenceFile.size, base64: compressedData.base64, mimeType: compressedData.mimeType };
+    }
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData })); } catch { /* storage full */ }
+    }
+  }, [open, formData, compressedData, referenceFile]);
+
   const resetForm = () => {
+    localStorage.removeItem(DRAFT_KEY);
     setFormData({ name: '', category: 'basic', previewUrl: '', prompt: '' });
     setReferenceFile(null);
     setCompressedData(null);
