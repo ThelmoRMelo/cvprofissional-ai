@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, category, imageBase64, imageMimeType } = await req.json();
+    const { prompt, category, imageBase64, imageMimeType, referenceImageUrl } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -26,40 +26,27 @@ serve(async (req) => {
     console.log("Category:", category);
     console.log("Has image:", !!imageBase64);
 
-    const systemPrompt = `Você é um especialista em design de currículos profissionais. Sua tarefa é gerar um template de currículo em HTML + CSS inline que seja:
+    const systemPrompt = `Você é um especialista em reproduzir currículos em HTML com fidelidade de pixel.
+Quando uma IMAGEM de referência for enviada, sua tarefa é fazer uma CÓPIA FIEL do layout dela:
+- Mesmo número de colunas e mesmas proporções (ex.: barra lateral de 35% à esquerda, se houver);
+- Mesmas cores exatas (estime os códigos hexadecimais de fundos, faixas, títulos e textos);
+- Mesma ordem e posição das seções, mesmos títulos de seção (texto igual ao da imagem);
+- Mesmos elementos decorativos: faixas, linhas divisórias, ícones simples, barras de habilidade, círculos;
+- Mesma tipografia aproximada (serifada/sem serifa, pesos, tamanhos, caixa alta);
+- Se a imagem tiver FOTO, coloque {{foto}} exatamente no mesmo lugar e formato (redonda/quadrada), dentro de um contêiner com largura/altura fixas e overflow:hidden.
+NÃO invente um design próprio, NÃO simplifique. Substitua apenas os textos pessoais pelos campos dinâmicos.
 
-1. ELEGANTE e PROFISSIONAL
-2. Responsivo e bem estruturado
-3. Com campos dinâmicos usando a sintaxe {{campo}}
+Campos dinâmicos (use exatamente esta sintaxe):
+{{foto}} {{nome}} {{email}} {{telefone}} {{endereco}} {{linkedin}} {{objetivo}} {{experiencias}} {{educacao}} {{habilidades}}
+({{experiencias}}, {{educacao}} e {{habilidades}} são substituídos por listas já formatadas — coloque cada um uma única vez, no local da seção correspondente.)
 
-Os campos dinâmicos disponíveis são:
-- {{nome}} - Nome completo
-- {{email}} - Email
-- {{telefone}} - Telefone
-- {{endereco}} - Endereço
-- {{objetivo}} - Objetivo profissional
-- {{experiencias}} - Lista de experiências (cada uma com cargo, empresa, periodo, descricao)
-- {{educacao}} - Lista de formações (cada uma com curso, instituicao, periodo)
-- {{habilidades}} - Lista de habilidades
-
-REGRAS IMPORTANTES:
-1. Use APENAS CSS inline nos elementos HTML
-2. O HTML deve ser completo e auto-contido
-3. Use cores profissionais baseadas na categoria: ${category === 'basic' ? 'tons de cinza e preto' : category === 'intermediate' ? 'azul escuro e cinza' : 'gradientes elegantes em tons de azul/verde escuro'}
-4. NÃO use JavaScript
-5. Estruture bem as seções: Dados Pessoais, Objetivo, Experiência, Educação, Habilidades
-6. O design deve parecer um currículo real, pronto para impressão
-7. Use fontes web-safe como Arial, Helvetica, Georgia
-8. Retorne APENAS o código HTML, sem explicações
-
-Exemplo de estrutura esperada:
-<div style="...">
-  <header style="...">
-    <h1 style="...">{{nome}}</h1>
-    <p style="...">{{email}} | {{telefone}}</p>
-  </header>
-  ...
-</div>`;
+REGRAS TÉCNICAS:
+1. Apenas CSS inline; sem JavaScript; sem imagens externas.
+2. Contêiner raiz com width:794px; min-height:1123px (A4), box-sizing:border-box.
+3. Para colunas use display:flex (não use position absolute para o layout principal).
+4. Fontes web-safe (Arial, Helvetica, Georgia, 'Times New Roman', Verdana).
+5. Retorne APENAS o HTML, sem explicações nem markdown.
+${category === 'basic' ? 'Sem referência: tons de cinza e preto.' : category === 'intermediate' ? 'Sem referência: azul escuro e cinza.' : 'Sem referência: tons elegantes de azul/verde escuro.'}`;
 
     const messages: any[] = [
       { role: "system", content: systemPrompt }
@@ -72,7 +59,7 @@ Exemplo de estrutura esperada:
         content: [
           {
             type: "text",
-            text: `Use esta imagem como referência visual para o layout do currículo. Inspire-se no design, cores e estrutura mostrados. Instruções adicionais do usuário: ${prompt || "Crie um currículo profissional baseado nesta referência."}`
+            text: `Reproduza FIELMENTE este currículo em HTML, copiando layout, colunas, cores, tipografia e posição de cada seção (e da foto, se houver). Instruções adicionais do usuário: ${prompt || "Crie um currículo profissional baseado nesta referência."}`
           },
           {
             type: "image_url",
@@ -98,7 +85,7 @@ Exemplo de estrutura esperada:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: imageBase64 ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
         messages,
       }),
     });
@@ -141,9 +128,9 @@ Exemplo de estrutura esperada:
     console.log("Template HTML generated successfully, length:", cleanHtml.length);
 
     // Now generate preview image using AI image generation
-    let previewUrl = '/placeholder.svg';
+    let previewUrl = typeof referenceImageUrl === 'string' && referenceImageUrl.startsWith('http') ? referenceImageUrl : '/placeholder.svg';
     
-    try {
+    if (previewUrl === '/placeholder.svg') try {
       console.log("Generating preview image...");
       
       const previewPrompt = `Create a professional resume/CV preview thumbnail image. 
