@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -11,6 +11,11 @@ export function useAdminAuth() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminExists, setAdminExists] = useState(true);
+  // Re-verify only when the signed-in USER changes. Token refreshes / SIGNED_IN events
+  // fired when the app regains focus (e.g. returning from the mobile file picker) must
+  // not trigger a loading state, otherwise the whole panel unmounts and open dialogs are lost.
+  const verifiedUserId = useRef<string | null>(null);
+  const userId = session?.user.id ?? null;
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
@@ -20,10 +25,11 @@ export function useAdminAuth() {
   }, []);
 
   useEffect(() => {
-    if (!session) { setIsAdmin(false); setLoading(false); return; }
+    if (!userId) { verifiedUserId.current = null; setIsAdmin(false); setLoading(false); return; }
+    if (verifiedUserId.current === userId) return;
+    verifiedUserId.current = userId;
     setLoading(true);
     setTimeout(async () => {
-      const userId = session.user.id;
       const { data, error } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
       if (error) {
         // Offline / network failure: trust the last verified result for this user.
@@ -39,7 +45,7 @@ export function useAdminAuth() {
         await useSettingsStore.getState().loadFromCloud();
       }
     }, 0);
-  }, [session]);
+  }, [userId]);
 
   return { session, isAdmin, loading, adminExists };
 }
