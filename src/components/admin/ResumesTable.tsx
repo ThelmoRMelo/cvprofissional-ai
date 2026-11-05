@@ -3,6 +3,7 @@ import { Resume, PLANS, PaymentStatus } from '@/types/resume';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useTemplateStore } from '@/store/templateStore';
 import { useState } from 'react';
 import { UserRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,6 +26,7 @@ export function ResumesTable({
   isOnline = true,
 }: ResumesTableProps) {
   const settings = useSettingsStore((state) => state.settings);
+  const templates = useTemplateStore((state) => state.templates);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
   const filteredResumes = resumes.filter((r) =>
     filter === 'all' ? true : r.paymentStatus === filter
@@ -112,7 +114,7 @@ export function ResumesTable({
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground capitalize">
-                      {resume.template}
+                      {templates.find((template) => template.id === resume.template)?.name || resume.template}
                     </td>
                     <td className="px-6 py-4">
                       {getStatusBadge(resume.paymentStatus)}

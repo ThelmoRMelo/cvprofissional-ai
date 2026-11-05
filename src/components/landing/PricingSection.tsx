@@ -29,8 +29,8 @@ export function PricingSection() {
   const settings = useSettingsStore((state) => state.settings);
   const [selectedPreview, setSelectedPreview] = useState<{ template: TemplateModel; planKey: Plan } | null>(null);
 
-  const handleSelectPlan = (plan: Plan) => {
-    const resume = createResume(plan);
+  const handleSelectPlan = (plan: Plan, templateId?: string) => {
+    const resume = createResume(plan, templateId);
     navigate(`/editor/${resume.id}`);
   };
 
@@ -235,8 +235,9 @@ export function PricingSection() {
                   type="button"
                   onClick={() => {
                     const plan = selectedPreview.planKey;
+                    const templateId = selectedPreview.template.id;
                     setSelectedPreview(null);
-                    handleSelectPlan(plan);
+                    handleSelectPlan(plan, templateId);
                   }}
                   className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                 >

@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Resume, Plan, PaymentStatus, ResumeTemplate } from '@/types/resume';
 import { saveResumeClientRpc } from '@/lib/resumeCloud';
+import { useTemplateStore } from '@/store/templateStore';
 
 interface ResumeState {
   resumes: Resume[];
   currentResume: Resume | null;
   
   // Actions
-  createResume: (plan: Plan) => Resume;
+  createResume: (plan: Plan, initialTemplateId?: string) => Resume;
   updateResume: (id: string, data: Partial<Resume>) => void;
   setCurrentResume: (resume: Resume | null) => void;
   getResumeById: (id: string) => Resume | undefined;
@@ -67,27 +68,39 @@ const syncResumeToCloud = async (resumeId: string): Promise<string | undefined> 
   }
 };
 
-const createEmptyResume = (plan: Plan): Resume => ({
-  id: generateId(),
-  clientName: '',
-  plan,
-  template: 'modern',
-  paymentStatus: 'pending',
-  downloadEnabled: false,
-  personalData: {
-    fullName: '',
-    email: '',
-    phone: '',
-    address: '',
-    linkedin: '',
-    objective: '',
-  },
-  experiences: [],
-  education: [],
-  skills: [],
-  createdAt: new Date(),
-  updatedAt: new Date(),
-});
+const createEmptyResume = (plan: Plan, initialTemplateId?: string): Resume => {
+  let defaultTemplate: ResumeTemplate = 'modern';
+  if (initialTemplateId) {
+    defaultTemplate = initialTemplateId;
+  } else {
+    const planTemplates = useTemplateStore.getState().templates.filter(
+      (template) => template.isActive && template.category === plan,
+    );
+    if (planTemplates.length > 0) defaultTemplate = planTemplates[0].id;
+  }
+
+  return {
+    id: generateId(),
+    clientName: '',
+    plan,
+    template: defaultTemplate,
+    paymentStatus: 'pending',
+    downloadEnabled: false,
+    personalData: {
+      fullName: '',
+      email: '',
+      phone: '',
+      address: '',
+      linkedin: '',
+      objective: '',
+    },
+    experiences: [],
+    education: [],
+    skills: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+};
 
 export const useResumeStore = create<ResumeState>()(
   persist(
@@ -95,8 +108,8 @@ export const useResumeStore = create<ResumeState>()(
       resumes: [],
       currentResume: null,
 
-      createResume: (plan: Plan) => {
-        const newResume = createEmptyResume(plan);
+      createResume: (plan: Plan, initialTemplateId?: string) => {
+        const newResume = createEmptyResume(plan, initialTemplateId);
         set((state) => ({
           resumes: [...state.resumes, newResume],
           currentResume: newResume,

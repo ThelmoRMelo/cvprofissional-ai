@@ -2,7 +2,7 @@ export type Plan = 'basic' | 'intermediate' | 'professional';
 
 export type PaymentStatus = 'pending' | 'receipt_sent' | 'confirmed';
 
-export type ResumeTemplate = 'modern' | 'classic' | 'minimal';
+export type ResumeTemplate = 'modern' | 'classic' | 'minimal' | string;
 
 export interface PersonalData {
   fullName: string;

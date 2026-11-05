@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Download, Lock, FileText } from 'lucide-react';
 import { useResumeStore } from '@/store/resumeStore';
+import { useTemplateStore } from '@/store/templateStore';
 import { ResumeForm } from '@/components/editor/ResumeForm';
 import { ResumePreview } from '@/components/editor/ResumePreview';
 import { TemplateSelector } from '@/components/editor/TemplateSelector';
@@ -15,6 +16,11 @@ export default function Editor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentResume, setCurrentResume, updateResume, syncResumeNow, applyRemoteUpdate } = useResumeStore();
+  const templates = useTemplateStore((state) => state.templates);
+  const categoryTemplates = useMemo(
+    () => templates.filter((template) => template.isActive && template.category === currentResume?.plan),
+    [templates, currentResume?.plan],
+  );
   const canDownloadRef = useRef(false);
   const printActionRef = useRef<() => void>(() => undefined);
 
@@ -43,6 +49,16 @@ export default function Editor() {
     if (!localResume) { navigate('/'); return; }
     setCurrentResume(localResume);
   }, [id, setCurrentResume, navigate]);
+
+  useEffect(() => {
+    if (!currentResume || currentResume.id !== id || categoryTemplates.length === 0) return;
+    const hasValidTemplate = categoryTemplates.some(
+      (template) => template.id === currentResume.template || template.name === currentResume.template,
+    );
+    if (!hasValidTemplate) {
+      updateResume(currentResume.id, { template: categoryTemplates[0].id });
+    }
+  }, [currentResume?.plan, currentResume?.template, currentResume?.id, categoryTemplates, id, updateResume]);
 
   useEffect(() => {
     const accessToken = currentResume?.id === id ? currentResume.accessToken : undefined;
@@ -186,6 +202,7 @@ export default function Editor() {
 
             <div className="bg-card rounded-2xl border border-border p-6">
               <TemplateSelector
+                plan={currentResume.plan}
                 selected={currentResume.template}
                 onSelect={handleTemplateChange}
               />

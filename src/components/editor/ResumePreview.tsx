@@ -1,4 +1,32 @@
+import { useMemo } from 'react';
 import { Resume, ResumeTemplate } from '@/types/resume';
+import { useTemplateStore } from '@/store/templateStore';
+
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const sanitizeTemplateHtml = (html: string) => {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  parsed.querySelectorAll('script, iframe, object, embed, form').forEach((element) => element.remove());
+  parsed.body.querySelectorAll('*').forEach((element) => {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      if (name.startsWith('on') || name === 'srcdoc') {
+        element.removeAttribute(attribute.name);
+      } else if (['href', 'src', 'xlink:href', 'action'].includes(name) && /^javascript:/i.test(value)) {
+        element.removeAttribute(attribute.name);
+      } else if (name === 'style' && /expression\s*\(|url\s*\(\s*['"]?\s*javascript:/i.test(value)) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  });
+  return parsed.body.innerHTML;
+};
 
 interface ResumePreviewProps {
   resume: Resume;
@@ -7,6 +35,65 @@ interface ResumePreviewProps {
 
 export function ResumePreview({ resume, template }: ResumePreviewProps) {
   const { personalData, experiences, education, skills } = resume;
+  const templates = useTemplateStore((state) => state.templates);
+
+  const matchedTemplate = useMemo(
+    () => templates.find((item) => item.id === template || item.name === template),
+    [templates, template],
+  );
+
+  const renderedDynamicHtml = useMemo(() => {
+    if (!matchedTemplate?.generatedHtml) return null;
+
+    let html = sanitizeTemplateHtml(matchedTemplate.generatedHtml);
+    // Older starter models contain static sample copy instead of client placeholders.
+    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|experiencias|educacao|habilidades)\}\}/i.test(html)) {
+      return null;
+    }
+    const safe = (value?: string, fallback = '') => escapeHtml(value || fallback);
+    html = html.replace(/\{\{nome\}\}/gi, () => safe(personalData.fullName, 'Seu Nome'));
+    html = html.replace(/\{\{email\}\}/gi, () => safe(personalData.email, 'seu.email@exemplo.com'));
+    html = html.replace(/\{\{telefone\}\}/gi, () => safe(personalData.phone, '(00) 00000-0000'));
+    html = html.replace(/\{\{endereco\}\}/gi, () => safe(personalData.address, 'Cidade - UF'));
+    html = html.replace(/\{\{linkedin\}\}/gi, () => safe(personalData.linkedin));
+    html = html.replace(/\{\{objetivo\}\}/gi, () => safe(personalData.objective, 'Objetivo profissional...'));
+
+    const experienceHtml = experiences.length > 0
+      ? experiences.map((experience) => `
+        <div style="margin-bottom: 10px;">
+          <strong>${safe(experience.position)}</strong> - <span>${safe(experience.company)}</span>
+          <div style="font-size: 11px; color: #6b7280;">${safe(experience.startDate)} - ${safe(experience.current ? 'Atual' : experience.endDate)}</div>
+          ${experience.description ? `<p style="margin: 4px 0 0 0; font-size: 12px;">${safe(experience.description)}</p>` : ''}
+        </div>
+      `).join('')
+      : '<p style="color: #9ca3af; font-size: 12px;">Preencha suas experiências profissionais.</p>';
+    html = html.replace(/\{\{experiencias\}\}/gi, () => experienceHtml);
+
+    const educationHtml = education.length > 0
+      ? education.map((item) => `
+        <div style="margin-bottom: 8px;">
+          <strong>${safe(item.degree)}${item.field ? ` em ${safe(item.field)}` : ''}</strong> - <span>${safe(item.institution)}</span>
+          <div style="font-size: 11px; color: #6b7280;">${safe(item.startDate)} - ${safe(item.current ? 'Atual' : item.endDate)}</div>
+        </div>
+      `).join('')
+      : '<p style="color: #9ca3af; font-size: 12px;">Preencha sua formação acadêmica.</p>';
+    html = html.replace(/\{\{educacao\}\}/gi, () => educationHtml);
+
+    const skillsHtml = skills.length > 0
+      ? `<div style="display: flex; flex-wrap: wrap; gap: 6px;">${skills.map((skill) => `<span style="background: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 11px;">${safe(skill.name)}</span>`).join('')}</div>`
+      : '<p style="color: #9ca3af; font-size: 12px;">Preencha suas habilidades.</p>';
+    html = html.replace(/\{\{habilidades\}\}/gi, () => skillsHtml);
+
+    return html;
+  }, [matchedTemplate, personalData, experiences, education, skills]);
+
+  if (renderedDynamicHtml) {
+    return (
+      <div className="resume-preview overflow-hidden rounded-xl bg-white shadow-lg scale-90 origin-top">
+        <div dangerouslySetInnerHTML={{ __html: renderedDynamicHtml }} />
+      </div>
+    );
+  }
 
   return (
     <div className="resume-preview p-8 text-sm text-gray-800 scale-90 origin-top">
