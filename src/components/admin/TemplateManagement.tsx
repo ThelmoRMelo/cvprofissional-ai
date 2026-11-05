@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit, Trash2, Eye, LayoutGrid, ArrowLeft, Code } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, LayoutGrid, ArrowLeft, Code, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTemplateStore } from '@/store/templateStore';
 import { Plan, PLANS, TemplateModel } from '@/types/resume';
 import { Switch } from '@/components/ui/switch';
@@ -47,6 +47,9 @@ export function TemplateManagement({ onBack, initialShowAdd = false, isOnline = 
   const filteredTemplates = templates.filter((t) =>
     filterCategory === 'all' ? true : t.category === filterCategory
   );
+  const visibleCategories: Plan[] = filterCategory === 'all'
+    ? ['basic', 'intermediate', 'professional']
+    : [filterCategory];
 
   const handleOpenAddDialog = () => {
     if (!isOnline) {
@@ -163,92 +166,111 @@ export function TemplateManagement({ onBack, initialShowAdd = false, isOnline = 
         ))}
       </div>
 
-      {/* Templates Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredTemplates.map((template) => (
-          <div
-            key={template.id}
-            className={cn(
-              'bg-card rounded-xl border border-border overflow-hidden transition-all hover:shadow-lg group',
-              !template.isActive && 'opacity-60'
-            )}
-          >
-            {/* Preview */}
-            <div className="aspect-[3/4] bg-secondary relative overflow-hidden">
-              <img
-                src={template.previewUrl && template.previewUrl.trim() !== '' ? template.previewUrl : '/placeholder.svg'}
-                alt={template.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = '/placeholder.svg';
-                }}
-              />
-              <div className="absolute inset-0 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button
-                  onClick={() => handleOpenEditDialog(template)}
-                  disabled={!isOnline}
-                  title={!isOnline ? 'Ação indisponível offline' : undefined}
-                  className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Edit className="w-4 h-4 text-primary" />
-                </button>
-                <button
-                  onClick={() => window.open(template.previewUrl || '/placeholder.svg', '_blank')}
-                  className="p-2 bg-white rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <Eye className="w-4 h-4 text-primary" />
-                </button>
-                <button
-                  onClick={() => handleDelete(template.id)}
-                  disabled={!isOnline}
-                  title={!isOnline ? 'Ação indisponível offline' : undefined}
-                  className="p-2 bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Trash2 className="w-4 h-4 text-white" />
-                </button>
-              </div>
-              {!template.isActive && (
-                <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                  Inativo
+      {/* Horizontal template carousels grouped by plan */}
+      <div className="space-y-7">
+        {visibleCategories.map((category) => {
+          const categoryTemplates = filteredTemplates.filter((template) => template.category === category);
+          return (
+            <section key={category} className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-foreground">{PLANS[category].name}</h3>
+                  {getCategoryBadge(category)}
+                  <span className="text-xs text-muted-foreground">{categoryTemplates.length} modelo{categoryTemplates.length === 1 ? '' : 's'}</span>
                 </div>
-              )}
-            </div>
-
-            {/* Info */}
-            <div className="p-4">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <h3 className="font-semibold text-foreground truncate">{template.name}</h3>
-                {getCategoryBadge(template.category)}
+                <Button size="sm" variant="outline" onClick={handleOpenAddDialog} disabled={!isOnline} title={!isOnline ? 'Ação indisponível offline' : undefined} className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </Button>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {template.isActive ? 'Ativo na landing' : 'Oculto'}
-                </span>
-                <Switch
-                  checked={template.isActive}
-                  onCheckedChange={() => toggleTemplateActive(template.id)}
-                  disabled={!isOnline}
-                  title={!isOnline ? 'Ação indisponível offline' : undefined}
-                />
-              </div>
-            </div>
-          </div>
-        ))}
 
-        {/* Add New Card */}
-        <button
-          onClick={handleOpenAddDialog}
-          disabled={!isOnline}
-          title={!isOnline ? 'Ação indisponível offline' : undefined}
-          className="aspect-[3/4] bg-secondary/50 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-3 hover:border-accent hover:bg-secondary transition-all group disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-            <Plus className="w-8 h-8 text-accent" />
-          </div>
-          <span className="text-muted-foreground group-hover:text-foreground transition-colors font-medium">
-            Adicionar modelo
-          </span>
-        </button>
+              <div className="group/admin-carousel relative" data-template-carousel-group>
+                <button
+                  type="button"
+                  aria-label={`Rolar modelos ${PLANS[category].name} para a esquerda`}
+                  onClick={(event) => event.currentTarget.parentElement?.querySelector<HTMLElement>('[data-template-carousel]')?.scrollBy({ left: -200, behavior: 'smooth' })}
+                  className="absolute -left-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform hover:scale-105"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <div
+                  data-template-carousel
+                  tabIndex={0}
+                  aria-label={`Modelos ${PLANS[category].name}`}
+                  className="flex h-[19rem] touch-pan-x snap-x snap-mandatory gap-4 overflow-x-auto px-3 py-1 scroll-smooth focus:outline-none"
+                  style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}
+                >
+                  {categoryTemplates.map((template) => (
+                    <article
+                      key={template.id}
+                      className={cn(
+                        'group relative flex h-[17.5rem] w-56 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-lg',
+                        !template.isActive && 'opacity-70',
+                      )}
+                    >
+                      <div className="relative h-32 shrink-0 overflow-hidden bg-secondary">
+                        <img
+                          src={template.previewUrl?.trim() || '/placeholder.svg'}
+                          alt={template.name}
+                          className="h-full w-full object-cover"
+                          onError={(event) => { event.currentTarget.src = '/placeholder.svg'; }}
+                        />
+                        <span className={cn(
+                          'absolute right-2 top-2 rounded-full px-2 py-1 text-[10px] font-semibold',
+                          template.isActive ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground',
+                        )}>
+                          {template.isActive ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
+                      <div className="flex min-h-0 flex-1 flex-col justify-between p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="line-clamp-2 text-sm font-semibold text-foreground" title={template.name}>{template.name}</h4>
+                          <Switch
+                            checked={template.isActive}
+                            onCheckedChange={() => toggleTemplateActive(template.id)}
+                            disabled={!isOnline}
+                            title={!isOnline ? 'Ação indisponível offline' : undefined}
+                            aria-label={`${template.isActive ? 'Desativar' : 'Ativar'} ${template.name}`}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => window.open(template.previewUrl || '/placeholder.svg', '_blank', 'noopener,noreferrer')}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> Ver
+                          </button>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="outline" onClick={() => handleOpenEditDialog(template)} disabled={!isOnline} title={!isOnline ? 'Ação indisponível offline' : `Editar ${template.name}`} className="h-8 w-8">
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="destructive" onClick={() => handleDelete(template.id)} disabled={!isOnline} title={!isOnline ? 'Ação indisponível offline' : `Excluir ${template.name}`} className="h-8 w-8">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                  {categoryTemplates.length === 0 && (
+                    <div className="flex h-56 w-full shrink-0 items-center justify-center rounded-xl border border-dashed border-border bg-secondary/30 text-sm text-muted-foreground">
+                      Nenhum modelo cadastrado nesta categoria.
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Rolar modelos ${PLANS[category].name} para a direita`}
+                  onClick={(event) => event.currentTarget.parentElement?.querySelector<HTMLElement>('[data-template-carousel]')?.scrollBy({ left: 200, behavior: 'smooth' })}
+                  className="absolute -right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform hover:scale-105"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {/* Add Template Dialog with AI */}

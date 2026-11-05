@@ -237,6 +237,60 @@ export function ResumeForm({ resume, onUpdate }: ResumeFormProps) {
                 placeholder="São Paulo, SP"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Data de nascimento</label>
+              <input
+                type="date"
+                value={resume.personalData.birthDate || ''}
+                onChange={(e) => updatePersonalData('birthDate', e.target.value)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Estado civil</label>
+              <select
+                value={resume.personalData.maritalStatus || ''}
+                onChange={(e) => updatePersonalData('maritalStatus', e.target.value)}
+                className="input-field"
+              >
+                <option value="">Selecione</option>
+                <option value="Solteiro(a)">Solteiro(a)</option>
+                <option value="Casado(a)">Casado(a)</option>
+                <option value="Divorciado(a)">Divorciado(a)</option>
+                <option value="União estável">União estável</option>
+                <option value="Viúvo(a)">Viúvo(a)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Nacionalidade</label>
+              <input
+                type="text"
+                value={resume.personalData.nationality || ''}
+                onChange={(e) => updatePersonalData('nationality', e.target.value)}
+                className="input-field"
+                placeholder="Ex: Brasileiro(a)"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">CNH (habilitação)</label>
+              <input
+                type="text"
+                value={resume.personalData.driverLicense || ''}
+                onChange={(e) => updatePersonalData('driverLicense', e.target.value)}
+                className="input-field"
+                placeholder="Ex: Categoria B ou Não possui"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-foreground mb-1">Portfólio / Site / GitHub</label>
+              <input
+                type="url"
+                value={resume.personalData.portfolio || ''}
+                onChange={(e) => updatePersonalData('portfolio', e.target.value)}
+                className="input-field"
+                placeholder="Ex: github.com/seuusuario ou seudominio.com"
+              />
+            </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-foreground mb-1">LinkedIn</label>
               <input

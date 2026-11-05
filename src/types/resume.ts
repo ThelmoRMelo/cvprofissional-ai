@@ -9,6 +9,11 @@ export interface PersonalData {
   email: string;
   phone: string;
   address: string;
+  birthDate?: string;
+  maritalStatus?: string;
+  nationality?: string;
+  driverLicense?: string;
+  portfolio?: string;
   linkedin?: string;
   objective?: string;
   photoUrl?: string;

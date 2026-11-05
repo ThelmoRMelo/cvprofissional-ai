@@ -114,15 +114,15 @@ export function PricingSection() {
                     </div>
 
                     {planTemplates.length > 0 ? (
-                      <div className="group/carousel relative">
+                      <div className="group/carousel relative h-36">
                         <button
                           type="button"
                           aria-label="Rolar modelos para a esquerda"
                           onClick={(event) => {
                             const container = event.currentTarget.parentElement?.querySelector('[data-template-carousel]');
-                            container?.scrollBy({ left: -180, behavior: 'smooth' });
+                            container?.scrollBy({ left: -200, behavior: 'smooth' });
                           }}
-                          className="absolute -left-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground opacity-100 shadow transition-opacity md:opacity-0 md:group-hover/carousel:opacity-100 md:focus:opacity-100"
+                          className="absolute -left-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform hover:scale-105"
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </button>
@@ -130,8 +130,8 @@ export function PricingSection() {
                           data-template-carousel
                           tabIndex={0}
                           aria-label={`Modelos do plano ${plan.name}`}
-                          className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1 pb-2 pt-1 scroll-smooth focus:outline-none"
-                          style={{ scrollbarWidth: 'thin' }}
+                          className="flex h-36 snap-x snap-mandatory touch-pan-x gap-2.5 overflow-x-auto px-3 pb-2 pt-1 scroll-smooth focus:outline-none"
+                          style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}
                         >
                           {planTemplates.map((template) => (
                             <button
@@ -139,7 +139,7 @@ export function PricingSection() {
                               type="button"
                               onClick={() => setSelectedPreview({ template, planKey })}
                               className={cn(
-                                'group relative h-24 w-16 shrink-0 snap-start overflow-hidden rounded-lg border-2 text-left shadow-sm transition-all duration-200 hover:scale-105',
+                                'group relative h-32 w-[5.5rem] shrink-0 snap-start overflow-hidden rounded-lg border-2 text-left shadow-sm transition-all duration-200 hover:scale-105',
                                 isFeatured ? 'border-white/30 hover:border-accent' : 'border-border bg-secondary hover:border-primary',
                               )}
                               title={`Clique para ampliar: ${template.name}`}
@@ -162,9 +162,9 @@ export function PricingSection() {
                           aria-label="Rolar modelos para a direita"
                           onClick={(event) => {
                             const container = event.currentTarget.parentElement?.querySelector('[data-template-carousel]');
-                            container?.scrollBy({ left: 180, behavior: 'smooth' });
+                            container?.scrollBy({ left: 200, behavior: 'smooth' });
                           }}
-                          className="absolute -right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background/90 text-foreground opacity-100 shadow transition-opacity md:opacity-0 md:group-hover/carousel:opacity-100 md:focus:opacity-100"
+                          className="absolute -right-3 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-md transition-transform hover:scale-105"
                         >
                           <ChevronRight className="h-4 w-4" />
                         </button>

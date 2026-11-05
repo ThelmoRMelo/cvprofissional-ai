@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Resume, ResumeTemplate } from '@/types/resume';
 import { useTemplateStore } from '@/store/templateStore';
 
@@ -8,6 +8,12 @@ const escapeHtml = (value: string) => value
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
+
+const formatDateForDisplay = (value?: string) => {
+  if (!value) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+};
 
 const sanitizeTemplateHtml = (html: string) => {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
@@ -35,7 +41,22 @@ interface ResumePreviewProps {
 
 export function ResumePreview({ resume, template }: ResumePreviewProps) {
   const { personalData, experiences, education, skills } = resume;
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
   const templates = useTemplateStore((state) => state.templates);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const updateScale = () => {
+      const availableWidth = viewport.clientWidth;
+      setPreviewScale(Math.min(1, availableWidth > 0 ? availableWidth / 794 : 1));
+    };
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
 
   const matchedTemplate = useMemo(
     () => templates.find((item) => item.id === template || item.name === template),
@@ -47,10 +68,48 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
 
     let html = sanitizeTemplateHtml(matchedTemplate.generatedHtml);
     // Older starter models contain static sample copy instead of client placeholders.
-    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|profissao|experiencias|educacao|habilidades(?:_barras)?|foto)\}\}/i.test(html)) {
+    if (!/\{\{(?:nome|email|telefone|endereco|linkedin|objetivo|profissao|experiencias|educacao|habilidades(?:_barras)?|foto|data_nascimento|estado_civil|nacionalidade|cnh|portfolio|dados_adicionais)\}\}/i.test(html)) {
       return null;
     }
     const safe = (value?: string, fallback = '') => escapeHtml(value || fallback);
+    const replaceOptional = (source: string, token: string, label: string, value?: string) => {
+      const escapedValue = value ? safe(value) : '';
+      if (escapedValue) return source.replace(new RegExp(`\\{\\{${token}\\}\\}`, 'gi'), () => escapedValue);
+      const document = new DOMParser().parseFromString(source, 'text/html');
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const matchingNodes: Text[] = [];
+      while (walker.nextNode()) {
+        const node = walker.currentNode as Text;
+        if (node.textContent?.includes(`{{${token}}}`)) matchingNodes.push(node);
+      }
+      for (const node of matchingNodes) {
+        let candidate = node.parentElement;
+        let removedLabeledRow = false;
+        while (candidate && candidate !== document.body) {
+          const hasLabel = new RegExp(label, 'i').test(candidate.textContent || '');
+          const withoutToken = candidate.innerHTML.replace(new RegExp(`\\{\\{${token}\\}\\}`, 'gi'), '');
+          if (hasLabel && !/\{\{[^}]+\}\}/.test(withoutToken)) {
+            candidate.remove();
+            removedLabeledRow = true;
+            break;
+          }
+          candidate = candidate.parentElement;
+        }
+        if (!removedLabeledRow) {
+          node.textContent = (node.textContent || '').replace(new RegExp(`(?:${label}\\s*[:：-]?\\s*)?\\{\\{${token}\\}\\}`, 'gi'), '');
+        }
+      }
+      document.body.querySelectorAll('span, li, p, div').forEach((element) => {
+        if (!element.textContent?.trim() && !element.querySelector('img, svg')) element.remove();
+      });
+      return document.body.innerHTML;
+    };
+    const additionalData = [
+      ['Nacionalidade', personalData.nationality],
+      ['Estado civil', personalData.maritalStatus],
+      ['Nascimento', formatDateForDisplay(personalData.birthDate)],
+      ['CNH', personalData.driverLicense],
+    ].filter(([, value]) => Boolean(value)).map(([label, value]) => `${label}: ${value}`).join(' · ');
     if (personalData.photoUrl) {
       const safePhotoUrl = safe(personalData.photoUrl);
       html = html.replace(/src=(['"])\{\{foto\}\}\1/gi, `src="${safePhotoUrl}"`);
@@ -65,12 +124,18 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
         .join('') || 'CV';
       html = html.replace(/\{\{foto\}\}/gi, `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:34px;font-weight:700;color:#718096;">${safe(initials)}</span>`);
     }
+    html = replaceOptional(html, 'portfolio', '(?:Portfólio|Site|GitHub)', personalData.portfolio);
+    html = replaceOptional(html, 'linkedin', '(?:LinkedIn|Perfil profissional)', personalData.linkedin);
+    html = replaceOptional(html, 'objetivo', '(?:Objetivo|Perfil profissional)', personalData.objective);
+    html = replaceOptional(html, 'data_nascimento', '(?:Data de )?Nascimento', formatDateForDisplay(personalData.birthDate));
+    html = replaceOptional(html, 'estado_civil', 'Estado civil', personalData.maritalStatus);
+    html = replaceOptional(html, 'nacionalidade', 'Nacionalidade', personalData.nationality);
+    html = replaceOptional(html, 'cnh', '(?:CNH|Habilitação)', personalData.driverLicense);
+    html = replaceOptional(html, 'dados_adicionais', 'Dados adicionais', additionalData);
     html = html.replace(/\{\{nome\}\}/gi, () => safe(personalData.fullName, 'Seu Nome'));
     html = html.replace(/\{\{email\}\}/gi, () => safe(personalData.email, 'seu.email@exemplo.com'));
     html = html.replace(/\{\{telefone\}\}/gi, () => safe(personalData.phone, '(00) 00000-0000'));
     html = html.replace(/\{\{endereco\}\}/gi, () => safe(personalData.address, 'Cidade - UF'));
-    html = html.replace(/\{\{linkedin\}\}/gi, () => safe(personalData.linkedin));
-    html = html.replace(/\{\{objetivo\}\}/gi, () => safe(personalData.objective, 'Objetivo profissional...'));
     html = html.replace(/\{\{profissao\}\}/gi, () => safe(experiences.find((experience) => experience.position)?.position, 'Profissional'));
 
     const experienceHtml = experiences.length > 0
@@ -111,14 +176,26 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
 
   if (renderedDynamicHtml) {
     return (
-      <div className="resume-preview overflow-hidden rounded-xl bg-white shadow-lg scale-90 origin-top">
-        <div dangerouslySetInnerHTML={{ __html: renderedDynamicHtml }} />
+      <div
+        ref={viewportRef}
+        className="resume-preview-viewport flex w-full max-w-full justify-center overflow-hidden"
+        style={{ height: `${1123 * previewScale}px` }}
+      >
+        <div className="resume-preview-scale" style={{ width: 794, height: 1123, transform: `scale(${previewScale})`, transformOrigin: 'top center' }}>
+          <div className="resume-preview min-h-[1123px] w-[794px] overflow-hidden rounded-xl bg-white shadow-lg" dangerouslySetInnerHTML={{ __html: renderedDynamicHtml }} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="resume-preview p-8 text-sm text-gray-800 scale-90 origin-top">
+    <div
+      ref={viewportRef}
+      className="resume-preview-viewport flex w-full max-w-full justify-center overflow-hidden"
+      style={{ height: `${1123 * previewScale}px` }}
+    >
+      <div className="resume-preview-scale" style={{ width: 794, height: 1123, transform: `scale(${previewScale})`, transformOrigin: 'top center' }}>
+      <div className="resume-preview min-h-[1123px] w-[794px] p-8 text-sm text-gray-800">
       {/* Header */}
       <div className={`mb-6 pb-4 border-b-2 ${template === 'modern' ? 'border-accent' : template === 'classic' ? 'border-gray-800' : 'border-gray-300'}`}>
         {personalData.photoUrl && (
@@ -134,6 +211,9 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
         </div>
         {personalData.linkedin && (
           <div className="mt-1 text-xs text-accent">{personalData.linkedin}</div>
+        )}
+        {personalData.portfolio && (
+          <div className="mt-1 text-xs text-accent">{personalData.portfolio}</div>
         )}
       </div>
 
@@ -225,6 +305,20 @@ export function ResumePreview({ resume, template }: ResumePreviewProps) {
           <p>Preencha seus dados para visualizar o currículo</p>
         </div>
       )}
+      {(personalData.birthDate || personalData.maritalStatus || personalData.nationality || personalData.driverLicense || personalData.portfolio) && (
+        <div className="mb-4">
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-800">Dados adicionais</h2>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
+            {personalData.nationality && <span>{personalData.nationality}</span>}
+            {personalData.maritalStatus && <span>{personalData.maritalStatus}</span>}
+            {personalData.birthDate && <span>{formatDateForDisplay(personalData.birthDate)}</span>}
+            {personalData.driverLicense && <span>CNH: {personalData.driverLicense}</span>}
+            {personalData.portfolio && <span>{personalData.portfolio}</span>}
+          </div>
+        </div>
+      )}
+      </div>
+      </div>
     </div>
   );
 }
