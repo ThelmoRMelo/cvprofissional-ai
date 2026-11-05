@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AddTemplateDialog } from './AddTemplateDialog';
+import { AddTemplateDialog, hasTemplateDraft } from './AddTemplateDialog';
 import { toast } from 'sonner';
 
 interface TemplateManagementProps {
@@ -33,7 +33,7 @@ interface TemplateManagementProps {
 
 export function TemplateManagement({ onBack, initialShowAdd = false, isOnline = true }: TemplateManagementProps) {
   const { templates, addTemplate, updateTemplate, deleteTemplate, toggleTemplateActive } = useTemplateStore();
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(initialShowAdd && isOnline);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(() => (initialShowAdd || hasTemplateDraft()) && isOnline);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateModel | null>(null);
   const [formData, setFormData] = useState({
