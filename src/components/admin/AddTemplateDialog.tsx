@@ -288,6 +288,7 @@ export function AddTemplateDialog({ open, onOpenChange, onTemplateCreated }: Add
           category: formData.category,
           imageBase64,
           imageMimeType,
+          referenceImageUrl: referenceFileUrl,
         },
       });
 
