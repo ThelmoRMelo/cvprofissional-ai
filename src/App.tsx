@@ -34,10 +34,38 @@ function MiniResume({ color, layout, name, photo }: { color:string; layout:numbe
   return <div className={`mini-resume layout-${layout}`}><div className="mini-top" style={{ background: color }}>{photo?<img className="mini-avatar-image" src={photo} alt=""/>:<span className="mini-avatar"/>}<span><b>{name || 'Seu nome aqui'}</b><i>{layout === 1 ? 'Especialista • Profissional' : 'Profissional • Área de atuação'}</i></span></div><div className="mini-body"><div><b>PERFIL</b><i/><i/><i className="short"/><b>EXPERIÊNCIA</b><i/><i/><i className="short"/><b>FORMAÇÃO</b><i/><i className="short"/></div><aside><b>CONTATO</b><i/><i className="short"/><b>COMPETÊNCIAS</b><i/><i/><i/><i className="short"/></aside></div></div>
 }
 function fillTemplateHtml(template:ResumeTemplate,candidate:Resume){
-  const values:Record<string,string>={name:candidate.name,full_name:candidate.name,fullname:candidate.name,role:candidate.role,job_title:candidate.role,email:candidate.email,phone:candidate.phone,city:candidate.city,summary:candidate.summary,experience:candidate.experience,education:candidate.education,skills:candidate.skills,linkedin:candidate.linkedin,portfolio:candidate.portfolio||'',birthdate:candidate.birthDate||'',maritalstatus:candidate.maritalStatus||'',nationality:candidate.nationality||'',driverlicense:candidate.driverLicense||'',photourl:candidate.photoUrl||'',photo_url:candidate.photoUrl||''};
-  const normalized=Object.fromEntries(Object.entries(values).map(([name,value])=>[name.toLowerCase(),value]));
-  const escaped=(value:string)=>value.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]||char)).replace(/\r?\n/g,'<br>');
-  return (template.generated_html||'').replace(/\{\{\s*(?:candidate\.)?([\w]+)\s*\}\}/gi,(placeholder,key:string)=>{const lookupKey=key.toLowerCase();const value=normalized[lookupKey];return value!==undefined?escaped(value):placeholder});
+  const photo=candidate.photoUrl||'';
+  const values:Record<string,string>={
+    name:candidate.name,full_name:candidate.name,fullname:candidate.name,nome:candidate.name,
+    role:candidate.role,job_title:candidate.role,profession:candidate.role,profissao:candidate.role, cargo:candidate.role,
+    email:candidate.email,phone:candidate.phone,telefone:candidate.phone,whatsapp:candidate.phone,
+    city:candidate.city,address:candidate.city,endereco:candidate.city,
+    summary:candidate.summary,objective:candidate.summary,objetivo:candidate.summary,
+    experience:candidate.experience,experiencia:candidate.experience,experiencias:candidate.experience,
+    education:candidate.education,educacao:candidate.education,formacao:candidate.education,
+    skills:candidate.skills,competencias:candidate.skills,habilidades:candidate.skills,
+    linkedin:candidate.linkedin,portfolio:candidate.portfolio||'',
+    birthdate:candidate.birthDate||'',data_nascimento:candidate.birthDate||'',
+    maritalstatus:candidate.maritalStatus||'',estado_civil:candidate.maritalStatus||'',
+    nationality:candidate.nationality||'',nacionalidade:candidate.nationality||'',
+    driverlicense:candidate.driverLicense||'',cnh:candidate.driverLicense||'',
+    photourl:photo,photo_url:photo,photo,imagem:photo,foto:photo,foto_perfil:photo
+  };
+  const normalizeKey=(key:string)=>key.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9_]/g,'');
+  const normalized=Object.fromEntries(Object.entries(values).map(([name,value])=>[normalizeKey(name),value]));
+  const escaped=(value:string)=>value.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]||char));
+  const photoKeys=new Set(['photo','photourl','photo_url','imagem','foto','foto_perfil']);
+  return (template.generated_html||'').replace(/\{\{\s*(?:candidate\.)?([\p{L}\p{N}_]+)\s*\}\}/giu,(placeholder,key:string,offset:number,source:string)=>{
+    const lookupKey=normalizeKey(key);const value=normalized[lookupKey];if(value===undefined)return placeholder;
+    if(photoKeys.has(lookupKey)){
+      const tagStart=source.lastIndexOf('<',offset);const tagEnd=source.lastIndexOf('>',offset);const beforeToken=source.slice(tagStart,offset);const afterToken=source.slice(offset+placeholder.length);
+      const inTag=tagStart>tagEnd;const inImageAttribute=inTag&&/<img\b/i.test(beforeToken)&&/\bsrc\s*=\s*["']?[^"']*$/i.test(beforeToken);const inCssUrl=/url\(\s*["']?$/i.test(beforeToken)&&/^\s*["']?\s*\)/.test(afterToken);
+      if(inImageAttribute||inCssUrl)return escaped(value);
+      if(!value)return '';
+      return `<img src="${escaped(value)}" alt="Foto do candidato" style="display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:50%"/>`;
+    }
+    return escaped(value).replace(/\r?\n/g,'<br>');
+  });
 }
 function CandidateResumePreview({candidate,template}:{candidate:Resume;template:ResumeTemplate}){
   if(template.generated_html?.trim())return <div className="resume-generated-template"><iframe title={`Prévia preenchida do modelo ${template.name}`} sandbox="" srcDoc={fillTemplateHtml(template,candidate)}/></div>;
