@@ -25,11 +25,11 @@ function TemplatePreview({item}:{item:AdminTemplate}) {
 
 async function compressTemplateImage(file:File):Promise<string>{
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Escolha uma imagem JPEG, PNG ou WebP.');
-  const image=await createImageBitmap(file);const scale=Math.min(1,600/Math.max(image.width,image.height));
+  const image=await createImageBitmap(file);const scale=Math.min(1,500/Math.max(image.width,image.height));
   const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
   const context=canvas.getContext('2d');if(!context)throw new Error('Não foi possível processar a imagem.');
   context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);image.close();
-  return canvas.toDataURL('image/jpeg',.85);
+  return canvas.toDataURL('image/jpeg',.80);
 }
 
 export default function AdminPanel({tab,setTab,tier,setTier,orders,templates,prices,planIds,pixConfigs,offline,onApprove,onRelease,onSavePix,onSignOut,notify,onImportTemplate,onUpdateTemplate,onDeleteTemplate}:Props){
