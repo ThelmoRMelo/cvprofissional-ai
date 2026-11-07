@@ -21,6 +21,9 @@
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "0.x",
+    "drizzle-orm": "0.x",
+    "postgres": "^4.1.0"
   }
 }

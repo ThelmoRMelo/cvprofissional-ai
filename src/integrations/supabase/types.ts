@@ -14,10 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          new_status: string | null
+          old_status: string | null
+          resume_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_status?: string | null
+          old_status?: string | null
+          resume_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          new_status?: string | null
+          old_status?: string | null
+          resume_id?: string
+        }
+        Relationships: []
+      }
+      pix_configs: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          pix_key: string
+          plan_id: string
+          qr_code_object_path: string | null
+          recipient_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          pix_key?: string
+          plan_id: string
+          qr_code_object_path?: string | null
+          recipient_name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          pix_key?: string
+          plan_id?: string
+          qr_code_object_path?: string | null
+          recipient_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_configs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string
+          currency: string
+          description: string
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          price_cents: number
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          description?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          price_cents?: number
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_cents?: number
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       resumes: {
         Row: {
           access_token: string
           admin_notes: string | null
+          amount_cents: number | null
+          approved_at: string | null
+          approved_by: string | null
           client_email: string
           client_name: string
           client_phone: string
@@ -28,12 +147,16 @@ export type Database = {
           payment_proof_path: string | null
           payment_status: string
           plan: string
+          released_at: string | null
           template_id: string | null
           updated_at: string
         }
         Insert: {
           access_token?: string
           admin_notes?: string | null
+          amount_cents?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_email?: string
           client_name?: string
           client_phone?: string
@@ -44,12 +167,16 @@ export type Database = {
           payment_proof_path?: string | null
           payment_status?: string
           plan?: string
+          released_at?: string | null
           template_id?: string | null
           updated_at?: string
         }
         Update: {
           access_token?: string
           admin_notes?: string | null
+          amount_cents?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
           client_email?: string
           client_name?: string
           client_phone?: string
@@ -60,6 +187,7 @@ export type Database = {
           payment_proof_path?: string | null
           payment_status?: string
           plan?: string
+          released_at?: string | null
           template_id?: string | null
           updated_at?: string
         }
@@ -146,6 +274,24 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      admin_release_download: {
+        Args: { _release: boolean; _resume_id: string }
+        Returns: undefined
+      }
+      admin_set_payment: {
+        Args: { _approve: boolean; _resume_id: string }
+        Returns: undefined
+      }
+      get_checkout: {
+        Args: { _token: string }
+        Returns: {
+          amount_cents: number
+          payment_status: string
+          pix_key: string
+          qr_code_object_path: string
+          recipient_name: string
+        }[]
+      }
       get_resume_status: {
         Args: { _token: string }
         Returns: {
