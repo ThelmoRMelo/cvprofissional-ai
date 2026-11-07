@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lovable.dev/ai-gateway": "^0.1.11",
     "@supabase/supabase-js": "^2.119.0",
     "@vitejs/plugin-react": "latest",
     "html2canvas": "^1.4.1",
