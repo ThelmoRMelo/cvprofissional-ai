@@ -5,3 +5,17 @@
 @media print{body *{visibility:hidden!important}.print-resume,.print-resume *{visibility:visible!important}.print-resume{display:block!important;position:absolute;left:0;top:0;width:100%;padding:36px 45px;color:#263c30;font:12pt Arial,sans-serif}.print-resume h1{font:700 28pt Georgia;margin-bottom:3px}.print-resume h3{font-size:13pt;color:#62766a;margin:0}.print-resume>p{font-size:9pt;line-height:1.6}.print-resume hr{border:0;border-top:1px solid #ccc;margin:18px 0}.print-resume h2{font:700 12pt Arial;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #bbb;padding-bottom:5px;margin:17px 0 8px}.print-control{display:none!important}}
 .demo-banner{display:flex;align-items:center;gap:7px;background:#f7f2e7;border:1px solid #eee4ce;border-radius:4px;padding:9px 11px;color:#8b774d;font-size:8px;line-height:1.5;margin:0 0 13px}.payment-demo{margin:0 0 13px}.admin-mobile-select{display:none}.print-resume{break-inside:avoid}
 @media(max-width:680px){.admin-mobile-select{display:block;width:100%;height:34px;border:1px solid #e2e6dd;border-radius:3px;background:#fff;padding:0 8px;color:#536556;font-size:9px}.admin-top{flex-wrap:wrap}.admin-top>div:first-child{max-width:60%}.admin-actions{margin-left:auto}}
+
+
+/* Hide Lovable badge */
+a[href*="lovable.dev"],
+iframe[src*="lovable.dev"],
+div[style*="Edit with Lovable"],
+#lovable-badge {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+}
