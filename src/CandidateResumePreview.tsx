@@ -7,7 +7,7 @@ export type ResumePreviewCandidate = {
 };
 export type ResumePreviewTemplate = { id:string; name:string; color:string; layout:number; preview_url?:string; generated_html?:string|null };
 
-function fillTemplateHtml(template:ResumePreviewTemplate,candidate:ResumePreviewCandidate){
+export function fillTemplateHtml(template:ResumePreviewTemplate,candidate:ResumePreviewCandidate):string{
   const photo=candidate.photoUrl||'';
   const values:Record<string,string>={
     name:candidate.name,full_name:candidate.name,fullname:candidate.name,nome:candidate.name,
