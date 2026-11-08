@@ -18,7 +18,7 @@ const tiers: { name: Tier; price: number; desc: string; features: string[]; tone
 ];
 const colors = ['#779283','#c5a56c','#394b43','#ab796b','#7b8d9d','#b18b78','#54685b','#ceaa6b'];
 const names = ['Essencial','Clareza','Primeiro passo','Horizonte','Trajetória','Foco','Conquista','Raiz','Atitude','Presença','Ponto de partida','Movimento','Vértice','Singular','Aurora','Marco','Caminho','Perspectiva','Legado','Novo capítulo'];
-const templates = Object.fromEntries(tiers.map((tier, t) => [tier.name, names.map((name, i) => ({ id: `${t}-${i}`, name: t === 0 ? name : t === 1 ? ['Ascensão','Equilíbrio','Conexão','Impulso','Evolução','Amplitude','Vanguarda','Essência','Rumo','Encontro','Clássico','Impacto','Ofício','Crescer','Caderno','Liderança','Estação','Pulsar','Colheita','Virada'][i] : ['Prestígio','Executivo','Signature','Nobre','Seleto','Ícone','Alto nível','Distinção','Reserva','Legado','Direção','Forma','Monograma','Estratégia','Soberano','Excelência','Atelier','Prime','Referência','Vanguarda'][i], color: colors[(i + t * 2) % colors.length], layout: (i + t) % 3 }))]));
+const templates = Object.fromEntries(tiers.map((tier, t) => [tier.name, t===2?[]:names.map((name, i) => ({ id: `${t}-${i}`, name: t === 0 ? name : ['Ascensão','Equilíbrio','Conexão','Impulso','Evolução','Amplitude','Vanguarda','Essência','Rumo','Encontro','Clássico','Impacto','Ofício','Crescer','Caderno','Liderança','Estação','Pulsar','Colheita','Virada'][i], color: colors[(i + t * 2) % colors.length], layout: (i + t) % 3 }))]));
 const blank: Resume = { name:'', email:'', phone:'', city:'', role:'', summary:'', experience:'', education:'', skills:'', linkedin:'', photoUrl:'', birthDate:'', maritalStatus:'', nationality:'', driverLicense:'', portfolio:'' };
 const ACCESS_TOKEN_KEY = 'cv_access_token';
 const CANDIDATE_CACHE_KEY = 'cv_candidate_cache';
@@ -34,6 +34,7 @@ type PixConfig = { id:string; plan_id:string; pix_key:string; recipient_name:str
 type Checkout = { amount_cents:number; recipient_name:string; pix_key:string; qr_code_object_path:string|null; payment_status:string };
 function readCache<T>(key:string,fallback:T):T{try{const value=localStorage.getItem(key);return value?JSON.parse(value) as T:fallback}catch{return fallback}}
 function cacheTemplateCatalog(catalog:Record<Tier,ResumeTemplate[]>){try{const safeCatalog=Object.fromEntries(Object.entries(catalog).map(([tier,items])=>[tier,items.map(item=>({...item,preview_url:item.preview_url?.startsWith('data:')&&item.preview_url.length>50000?'':item.preview_url}))]));localStorage.setItem(TEMPLATES_CACHE_KEY,JSON.stringify(safeCatalog))}catch{/* cache quota failures do not affect the in-memory catalog */}}
+function readTemplateCatalog():Record<Tier,ResumeTemplate[]>{const cached=readCache(TEMPLATES_CACHE_KEY,templates as Record<Tier,ResumeTemplate[]>);const catalog={...cached,Profissional:(cached.Profissional||[]).filter(item=>!/^2-\d+$/.test(item.id))};cacheTemplateCatalog(catalog);return catalog}
 
 function MiniResume({ color, layout, name, photo }: { color:string; layout:number; name:string; photo?:string }) {
   return <div className={`mini-resume layout-${layout}`}><div className="mini-top" style={{ background: color }}>{photo?<img className="mini-avatar-image" src={photo} alt=""/>:<span className="mini-avatar"/>}<span><b>{name || 'Seu nome aqui'}</b><i>{layout === 1 ? 'Especialista • Profissional' : 'Profissional • Área de atuação'}</i></span></div><div className="mini-body"><div><b>PERFIL</b><i/><i/><i className="short"/><b>EXPERIÊNCIA</b><i/><i/><i className="short"/><b>FORMAÇÃO</b><i/><i className="short"/></div><aside><b>CONTATO</b><i/><i className="short"/><b>COMPETÊNCIAS</b><i/><i/><i/><i className="short"/></aside></div></div>
@@ -47,7 +48,7 @@ function App() {
   const [purchasedTemplateId, setPurchasedTemplateId] = useState<string | null>(()=>{try{const token=localStorage.getItem(ACCESS_TOKEN_KEY);if(!token)return null;const draft=JSON.parse(localStorage.getItem('cv_resume_draft_'+token)||'{}');return typeof draft.template_id==='string'?draft.template_id:null}catch{return null}});
   const [previewTemplate, setPreviewTemplate] = useState<ResumeTemplate|null>(null);
   const [candidate, setCandidate] = useState<Resume>(()=>{try{const cached=JSON.parse(localStorage.getItem(CANDIDATE_CACHE_KEY)||'{}') as Resume;const cachedPhoto=localStorage.getItem(CANDIDATE_PHOTO_KEY)||'';return {...blank,...cached,photoUrl:cached.photoUrl||cachedPhoto||''}}catch{return blank}});
-  const [templateCatalog, setTemplateCatalog] = useState<Record<Tier,Array<{id:string;name:string;color:string;layout:number;preview_url?:string;generated_html?:string|null}>>>(()=>readCache(TEMPLATES_CACHE_KEY,templates as Record<Tier,Array<{id:string;name:string;color:string;layout:number}>>));
+  const [templateCatalog, setTemplateCatalog] = useState<Record<Tier,Array<{id:string;name:string;color:string;layout:number;preview_url?:string;generated_html?:string|null}>>>(readTemplateCatalog);
   const [step, setStep] = useState<'form'|'plans'|'payment'|'done'|null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saved, setSaved] = useState(false);
