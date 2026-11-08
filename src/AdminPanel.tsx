@@ -26,11 +26,13 @@ function TemplatePreview({item}:{item:AdminTemplate}) {
 
 async function compressTemplateImage(file:File):Promise<string>{
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Escolha uma imagem JPEG, PNG ou WebP.');
-  const image=await createImageBitmap(file);const scale=Math.min(1,500/Math.max(image.width,image.height));
-  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
-  const context=canvas.getContext('2d');if(!context)throw new Error('Não foi possível processar a imagem.');
-  context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);image.close();
-  return canvas.toDataURL('image/jpeg',.80);
+  const image=await createImageBitmap(file,{imageOrientation:'from-image'});
+  try{const scale=Math.min(1,1400/Math.max(image.width,image.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
+    const context=canvas.getContext('2d',{alpha:false});if(!context)throw new Error('Não foi possível processar a imagem.');
+    context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL('image/jpeg',.90);
+  }finally{image.close()}
 }
 async function compressQrCodeImage(file:File):Promise<string>{
   if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Escolha uma imagem JPEG, PNG ou WebP.');
