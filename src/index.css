@@ -47,3 +47,8 @@ div[style*="Edit with Lovable"],
 .resume-preview-loading{min-height:320px;display:grid;place-items:center;color:#718176;font-size:11px}
 
 .print-resume.print-resume-custom{padding:0;border:0;background:#fff;color:initial;font:14px/normal Arial,Helvetica,sans-serif;box-sizing:border-box;width:794px;min-height:0;overflow:visible}.print-resume.print-resume-custom *{box-sizing:border-box}.print-resume.print-resume-custom img{max-width:100%}
+
+/* Scale generated A4 previews to the available mobile width while keeping their internal 794px canvas. */
+.resume-generated-template{position:relative;width:min(794px,100%);min-height:0;height:1123px;margin:0 auto;background:#fff;box-shadow:0 12px 35px #23362c1a;overflow:hidden;flex:0 0 auto}
+.resume-generated-template iframe{position:absolute;top:0;left:50%;display:block;width:794px;height:1123px;max-width:none;border:0;background:#fff;transform-origin:top center}
+@media(max-width:680px){.form-preview .mini-resume{margin-right:-8px}}

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 
 export type ResumePreviewCandidate = {
@@ -42,8 +43,23 @@ export function fillTemplateHtml(template:ResumePreviewTemplate,candidate:Resume
   });
 }
 
+function GeneratedResumeFrame({template,candidate}:{template:ResumePreviewTemplate;candidate:ResumePreviewCandidate}){
+  const hostRef=useRef<HTMLDivElement>(null);
+  const [scale,setScale]=useState(1);
+  useLayoutEffect(()=>{
+    const host=hostRef.current;
+    if(!host)return;
+    const measure=()=>setScale(Math.min(1,host.clientWidth/794));
+    measure();
+    const observer=new ResizeObserver(measure);
+    observer.observe(host);
+    return()=>observer.disconnect();
+  },[]);
+  return <div ref={hostRef} className="resume-generated-template" style={{height:`${1123*scale}px`}}><iframe title={`Prévia preenchida do modelo ${template.name}`} sandbox="" srcDoc={fillTemplateHtml(template,candidate)} style={{transform:`translateX(-50%) scale(${scale})`}}/></div>;
+}
+
 export default function CandidateResumePreview({candidate,template}:{candidate:ResumePreviewCandidate;template:ResumePreviewTemplate}){
-  if(template.generated_html?.trim())return <div className="resume-generated-template"><iframe title={`Prévia preenchida do modelo ${template.name}`} sandbox="" srcDoc={fillTemplateHtml(template,candidate)}/></div>;
+  if(template.generated_html?.trim())return <GeneratedResumeFrame candidate={candidate} template={template}/>;
   if(template.preview_url)return <div className="resume-template-not-ready"><div className="resume-reference-card"><span className="eyebrow">MODELO ESCOLHIDO</span><img src={template.preview_url} alt={`Imagem original do modelo ${template.name}`}/><b>{template.name}</b></div><div className="resume-template-notice"><Sparkles size={20}/><h3>Este modelo está cadastrado como imagem de referência.</h3><p>Para preencher o próprio design com seus dados, a imagem precisa ser convertida em um modelo HTML editável. Essa estrutura será gerada e salva pelo processamento de templates no backend.</p><div><b>Dados que serão aplicados</b><span>{candidate.name||'Seu nome completo'} · {candidate.role||'Seu cargo desejado'}</span><span>{[candidate.email,candidate.phone,candidate.city].filter(Boolean).join(' · ')||'Seus contatos'}</span></div></div></div>;
   const contacts=[candidate.email,candidate.phone,candidate.city,candidate.linkedin,candidate.portfolio].filter(Boolean);
   const skills=candidate.skills.split(/[,;\n]/).map(item=>item.trim()).filter(Boolean);
