@@ -62,7 +62,7 @@ function fillTemplateHtml(template:ResumeTemplate,candidate:Resume){
       const inTag=tagStart>tagEnd;const inImageAttribute=inTag&&/<img\b/i.test(beforeToken)&&/\bsrc\s*=\s*["']?[^"']*$/i.test(beforeToken);const inCssUrl=/url\(\s*["']?$/i.test(beforeToken)&&/^\s*["']?\s*\)/.test(afterToken);
       if(inImageAttribute||inCssUrl)return escaped(value);
       if(!value)return '';
-      return `<img src="${escaped(value)}" alt="Foto do candidato" style="display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;border-radius:50%"/>`;
+      return `<img src="${escaped(value)}" alt="Foto do candidato" style="display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:cover;border-radius:50%"/>`;
     }
     return escaped(value).replace(/\r?\n/g,'<br>');
   });
