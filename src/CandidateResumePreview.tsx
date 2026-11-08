@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
+import ResolvedImage from './ResolvedImage';
 
 export type ResumePreviewCandidate = {
   name:string; email:string; phone:string; city:string; role:string; summary:string; experience:string;
@@ -60,7 +61,7 @@ function GeneratedResumeFrame({template,candidate}:{template:ResumePreviewTempla
 
 export default function CandidateResumePreview({candidate,template}:{candidate:ResumePreviewCandidate;template:ResumePreviewTemplate}){
   if(template.generated_html?.trim())return <GeneratedResumeFrame candidate={candidate} template={template}/>;
-  if(template.preview_url)return <div className="resume-template-not-ready"><div className="resume-reference-card"><span className="eyebrow">MODELO ESCOLHIDO</span><img src={template.preview_url} alt={`Imagem original do modelo ${template.name}`}/><b>{template.name}</b></div><div className="resume-template-notice"><Sparkles size={20}/><h3>Este modelo está cadastrado como imagem de referência.</h3><p>Para preencher o próprio design com seus dados, a imagem precisa ser convertida em um modelo HTML editável. Essa estrutura será gerada e salva pelo processamento de templates no backend.</p><div><b>Dados que serão aplicados</b><span>{candidate.name||'Seu nome completo'} · {candidate.role||'Seu cargo desejado'}</span><span>{[candidate.email,candidate.phone,candidate.city].filter(Boolean).join(' · ')||'Seus contatos'}</span></div></div></div>;
+  if(template.preview_url)return <div className="resume-template-not-ready"><div className="resume-reference-card"><span className="eyebrow">MODELO ESCOLHIDO</span><ResolvedImage source={template.preview_url} id={`resume-${template.id}`} className="resume-reference-image" alt={`Imagem original do modelo ${template.name}`} loading="eager"/><b>{template.name}</b></div><div className="resume-template-notice"><Sparkles size={20}/><h3>Este modelo está cadastrado como imagem de referência.</h3><p>Para preencher o próprio design com seus dados, a imagem precisa ser convertida em um modelo HTML editável. Essa estrutura será gerada e salva pelo processamento de templates no backend.</p><div><b>Dados que serão aplicados</b><span>{candidate.name||'Seu nome completo'} · {candidate.role||'Seu cargo desejado'}</span><span>{[candidate.email,candidate.phone,candidate.city].filter(Boolean).join(' · ')||'Seus contatos'}</span></div></div></div>;
   const contacts=[candidate.email,candidate.phone,candidate.city,candidate.linkedin,candidate.portfolio].filter(Boolean);
   const skills=candidate.skills.split(/[,;\n]/).map(item=>item.trim()).filter(Boolean);
   const additional=[candidate.birthDate&&`Nascimento: ${new Date(`${candidate.birthDate}T00:00:00`).toLocaleDateString('pt-BR')}`,candidate.maritalStatus,candidate.nationality,candidate.driverLicense&&candidate.driverLicense!=='Não possuo'?`CNH ${candidate.driverLicense}`:''].filter(Boolean);

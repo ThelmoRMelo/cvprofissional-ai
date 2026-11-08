@@ -13,9 +13,9 @@ export function storageLocation(source:string,kind:ImageKind):{bucket:string;pat
   if(match)return {bucket:match[1],path:decodeURIComponent(match[2])};
   if(classifyImageSource(source)!=='storage')return null;
   const clean=source.replace(/^\/+/, '');
-  const known=['template-references','qr-codes','pix-qr-codes'];
+  const known=['template-references','pix-qr-codes','qr-codes'];
   const bucket=known.find(name=>clean.startsWith(`${name}/`));
-  return {bucket:bucket|| (kind==='template'?'template-references':'qr-codes'),path:bucket?clean.slice(bucket.length+1):clean};
+  return {bucket:bucket|| (kind==='template'?'template-references':'pix-qr-codes'),path:bucket?clean.slice(bucket.length+1):clean};
 }
 export async function resolveImageSource(source:string,kind:ImageKind):Promise<{url:string;revoke?:()=>void}>{
   if(!source)throw new Error('Imagem não cadastrada.');
@@ -36,7 +36,7 @@ export async function persistImageSource(source:string,kind:ImageKind):Promise<s
   if(classifyImageSource(source)!=='data')return source;
   const blob=await (await fetch(source)).blob();
   if(!['image/jpeg','image/png','image/webp'].includes(blob.type)||blob.size>5*1024*1024)throw new Error('Envie JPEG, PNG ou WebP de até 5 MB.');
-  const bucket=kind==='template'?'template-references':'qr-codes';
+  const bucket=kind==='template'?'template-references':'pix-qr-codes';
   const extension=blob.type==='image/png'?'png':blob.type==='image/webp'?'webp':'jpg';
   const path=`${crypto.randomUUID()}.${extension}`;
   const {error}=await supabase.storage.from(bucket).upload(path,blob,{contentType:blob.type,upsert:false});
