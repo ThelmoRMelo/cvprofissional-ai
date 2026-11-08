@@ -52,3 +52,20 @@ div[style*="Edit with Lovable"],
 .resume-generated-template{position:relative;width:min(794px,100%);min-height:0;height:1123px;margin:0 auto;background:#fff;box-shadow:0 12px 35px #23362c1a;overflow:hidden;flex:0 0 auto}
 .resume-generated-template iframe{position:absolute;top:0;left:50%;display:block;width:794px;height:1123px;max-width:none;border:0;background:#fff;transform-origin:top center}
 @media(max-width:680px){.form-preview .mini-resume{margin-right:-8px}}
+
+/* Keep every landing section inside the phone viewport and center its content. */
+@media(max-width:680px){
+  html,body,#root,.site-shell{width:100%;max-width:100%;min-width:0;margin-inline:0;overflow-x:clip}
+  .site-header,.hero,.hero-bottom,.steps-section,.templates-section,.plans-section,.quote-section,.faq-section,.closing-cta,.site-footer{width:100%;max-width:100%;min-width:0;margin-inline:auto;box-sizing:border-box}
+  .header-inner,.hero-grid,.hero-copy,.hero-art,.templates-head,.templates-head>*,.plans-grid,.faq-section>*,.footer-top,.footer-top>*,.footer-bottom,.footer-bottom>*{min-width:0}
+  .hero h1,.hero-sub,.section-intro,.templates-head p,.step-item,.plan-card,.faq-list,.footer-top p{max-width:100%;overflow-wrap:anywhere}
+  .hero-buttons{flex-wrap:wrap;min-width:0}
+  .hero-bottom{gap:10px}
+  .hero-bottom>*,.hero-bottom-right{min-width:0;overflow-wrap:anywhere}
+  .template-tabs{max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+  .template-tabs::-webkit-scrollbar{display:none}
+  .template-grid,.plans-grid{width:100%;min-width:0}
+  .footer-bottom{flex-wrap:wrap}
+  .form-preview{min-width:0;max-width:100%}
+  .form-preview>div:first-child{min-width:0;overflow-wrap:anywhere}
+}
