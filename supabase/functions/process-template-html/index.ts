@@ -78,7 +78,11 @@ async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, ba
           thinkingConfig: { thinkingLevel: 'low' },
         },
       }),
-    });
+    }); } catch (err) {
+      console.error(`Gemini ${model} falhou após ${Date.now() - t0}ms:`, String(err));
+      lastError = String(err);
+      continue;
+    }
 
     if (res.status === 429) {
       throw new Error('Limite de requisições da sua chave do Gemini atingido temporariamente. Tente novamente em alguns segundos.');
