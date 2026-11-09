@@ -44,17 +44,18 @@ async function extractImageData(imageUrl: string): Promise<{ mimeType: string; d
 }
 
 async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, base64Data: string): Promise<string> {
-  const models = ['gemini-flash-latest', 'gemini-3.8-flash'];
+  // [modelo, tempo máximo em ms] — soma abaixo do limite de ~150s da função
+  const models: [string, number][] = [['gemini-3.8-flash', 60000], ['gemini-flash-latest', 45000], ['gemini-flash-lite-latest', 35000]];
   let lastError = '';
 
-  for (const model of models) {
+  for (const [model, timeoutMs] of models) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const t0 = Date.now();
     let res: Response;
     try { res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(70000),
+      signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         system_instruction: {
           parts: [{ text: SYSTEM_PROMPT }],
@@ -84,7 +85,7 @@ async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, ba
       continue;
     }
 
-    if (res.status === 429) {
+    if (res.status === 429 && model === models[models.length - 1][0]) {
       throw new Error('Limite de requisições da sua chave do Gemini atingido temporariamente. Tente novamente em alguns segundos.');
     }
 
