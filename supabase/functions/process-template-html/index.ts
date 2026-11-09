@@ -52,7 +52,7 @@ async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, ba
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(130000),
+      signal: AbortSignal.timeout(140000),
       body: JSON.stringify({
         system_instruction: {
           parts: [{ text: SYSTEM_PROMPT }],
@@ -73,6 +73,7 @@ async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, ba
         generationConfig: {
           temperature: 0.2,
           maxOutputTokens: 32768,
+          thinkingConfig: { thinkingLevel: 'low' },
         },
       }),
     });
