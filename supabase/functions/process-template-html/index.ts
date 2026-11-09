@@ -44,7 +44,7 @@ async function extractImageData(imageUrl: string): Promise<{ mimeType: string; d
 }
 
 async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, base64Data: string): Promise<string> {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+  const models = ['gemini-3.8-flash', 'gemini-flash-latest'];
   let lastError = '';
 
   for (const model of models) {
@@ -52,6 +52,7 @@ async function generateHtmlWithGeminiDirect(apiKey: string, mimeType: string, ba
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(130000),
       body: JSON.stringify({
         system_instruction: {
           parts: [{ text: SYSTEM_PROMPT }],
