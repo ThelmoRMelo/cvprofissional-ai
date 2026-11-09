@@ -1,0 +1,4 @@
+CREATE POLICY "Admin upload pix qr codes" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'pix-qr-codes' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+CREATE POLICY "Admin update pix qr codes" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'pix-qr-codes' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+CREATE POLICY "Admin delete pix qr codes" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'pix-qr-codes' AND public.has_role(auth.uid(), 'admin'::public.app_role));
+CREATE POLICY "Sign pix qr codes for checkout" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'pix-qr-codes');
